@@ -14,36 +14,42 @@
         if (typeof url === 'string' && url.includes('api.wallapop.com/api/v3/search?') && !url.includes('searchalerts')) {
             console.log('🎯 Interceptando llamada a Wallapop API:', url);
             
-            return originalFetch.apply(this, args)
-                .then(response => {
-                    const clonedResponse = response.clone();
-                    
-                    clonedResponse.json()
-                        .then(data => {
-                            console.log('📦 Respuesta JSON de Wallapop API:');
-                            console.log('URL:', url);
-                            console.log('Status:', response.status);
-                            console.log('Headers:', Object.fromEntries(response.headers.entries()));
-                            console.log('Data:', data);
-                            console.log('---');
-                            
-                            // Extraer user_ids de la respuesta
-                            extractUserIds(data, url);
-                        })
-                        .catch(err => {
-                            console.log('❌ Error al parsear JSON:', err);
-                        });
-                    
-                    return response;
-                })
-                .catch(error => {
-                    console.log('❌ Error en la llamada:', error);
-                    throw error;
-                });
+            return sniffResponse(originalFetch.apply(this, args), url);
         }
         
         return originalFetch.apply(this, args);
     };
+    
+    // Devuelve la respuesta tal cual y lee una copia en segundo plano
+    async function sniffResponse(responsePromise, url) {
+        let response;
+        try {
+            response = await responsePromise;
+        } catch (error) {
+            console.log('❌ Error en la llamada:', error);
+            throw error;
+        }
+        
+        void readSearchBody(response.clone(), response, url);
+        return response;
+    }
+    
+    async function readSearchBody(clonedResponse, response, url) {
+        try {
+            const data = await clonedResponse.json();
+            console.log('📦 Respuesta JSON de Wallapop API:');
+            console.log('URL:', url);
+            console.log('Status:', response.status);
+            console.log('Headers:', Object.fromEntries(response.headers.entries()));
+            console.log('Data:', data);
+            console.log('---');
+            
+            // Extraer user_ids de la respuesta
+            extractUserIds(data, url);
+        } catch (err) {
+            console.log('❌ Error al parsear JSON:', err);
+        }
+    }
     
     // Interceptar XMLHttpRequest
     const originalXHROpen = XMLHttpRequest.prototype.open;

@@ -329,6 +329,13 @@ class WallapopFilter {
     return results;
   }
 
+  // Productos que aporta un nodo añadido al DOM: él mismo o sus descendientes
+  findProductsIn(node) {
+    const selector = '.item-card_ItemCard--vertical__CNrfk';
+    if (node.matches?.(selector)) return [node];
+    return node.querySelectorAll?.(selector) ?? [];
+  }
+
   setupObserver() {
     if (this.observer) {
       this.observer.disconnect();
@@ -341,8 +348,7 @@ class WallapopFilter {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
           for (const node of mutation.addedNodes) {
             if (node.nodeType === Node.ELEMENT_NODE) {
-              const newProducts = node.matches?.('.item-card_ItemCard--vertical__CNrfk') ? [node] : 
-                                 node.querySelectorAll ? node.querySelectorAll('.item-card_ItemCard--vertical__CNrfk') : [];
+              const newProducts = this.findProductsIn(node);
               
               if (newProducts.length > 0) {
                 console.log(`🔄 Detectados ${newProducts.length} nuevos productos`);
@@ -389,22 +395,8 @@ class WallapopFilter {
     let visibleCount = 0;
     let hiddenCount = 0;
 
-    results.forEach((productLink, index) => {
-      const isReserved = this.isItemReserved(productLink);
-      let shouldShow = true;
-      
-      switch (this.filterMode) {
-        case 'reserved':
-          shouldShow = isReserved;
-          break;
-          
-        case 'available':
-          shouldShow = !isReserved;
-          break;
-          
-        default: // 'all'
-          shouldShow = true;
-      }
+    results.forEach((productLink) => {
+      const shouldShow = this.matchesFilter(this.isItemReserved(productLink));
       
       // ✅ USAR TU MÉTODO QUE FUNCIONA
       const card = productLink.closest('article, li, [data-testid="item-card"], .ItemCard, .item-card, [class*="ItemCard"], [class*="Card"]') || productLink;
@@ -420,6 +412,18 @@ class WallapopFilter {
 
     console.log(`📊 Filtro aplicado (${this.filterMode}): ${visibleCount} visibles, ${hiddenCount} ocultos`);
     this.updateFilterIndicator(visibleCount, results.length);
+  }
+
+  // ¿Debe mostrarse un anuncio con este estado de reserva con el filtro actual?
+  matchesFilter(isReserved) {
+    switch (this.filterMode) {
+      case 'reserved':
+        return isReserved;
+      case 'available':
+        return !isReserved;
+      default: // 'all'
+        return true;
+    }
   }
 
   isItemReserved(productLink) {
@@ -546,10 +550,15 @@ class WallapopFilter {
 
     indicator.classList.toggle('ml-above', diff > 0);
     indicator.classList.toggle('ml-below', diff < 0);
-    indicator.textContent = diff === 0
-      ? '= media'
-      : `${diff > 0 ? '+' : '−'}${Math.abs(diff).toLocaleString('es-ES', { useGrouping: 'always' })} €`;
+    indicator.textContent = this.formatDiff(diff);
     indicator.title = `Comparado con la media de ${this.formatPrice(average)}`;
+  }
+
+  // Diferencia con la media: "+75 €", "−125 €" o "= media"
+  formatDiff(diff) {
+    if (diff === 0) return '= media';
+    const sign = diff > 0 ? '+' : '−';
+    return `${sign}${Math.abs(diff).toLocaleString('es-ES', { useGrouping: 'always' })} €`;
   }
 
   formatPrice(value) {
