@@ -3,6 +3,7 @@
 class WallapopFilter {
   constructor() {
     this.filterMode = 'all'; // 'all', 'reserved', 'available'
+    this.extensionEnabled = true;
     this.isInitialized = false;
     this.observer = null;
     this.filterIndicator = null;
@@ -252,10 +253,17 @@ class WallapopFilter {
       this.sidebarInterval = null;
     }
     
+    // Quitar listeners de ventana y de runtime
+    if (this.onScroll) window.removeEventListener('scroll', this.onScroll);
+    if (this.onWindowMessage) window.removeEventListener('message', this.onWindowMessage);
+    if (this.onRuntimeMessage) {
+      try { chrome.runtime.onMessage.removeListener(this.onRuntimeMessage); } catch (e) {}
+    }
+    
     // Remover sidebar del DOM
-    if (this.sidebar) {
-      this.sidebar.remove();
-      this.sidebar = null;
+    if (this.filterIndicator) {
+      this.filterIndicator.remove();
+      this.filterIndicator = null;
     }
     
     // Remover tab del DOM
@@ -583,6 +591,7 @@ class WallapopFilter {
     const diff = price - this.priceAnalysis.averagePrice;
     const indicator = document.createElement('span');
     indicator.className = 'wallapop-price-indicator';
+    indicator.dataset.price = price;
 
     let text = '=', color = '#ffd43b';
     if (diff > 0) { text = `+${diff.toFixed(0)}€`; color = '#ff4757'; }
@@ -642,6 +651,7 @@ class WallapopFilter {
       console.log(`📊 Análisis completado: ${prices.length} precios, promedio: ${this.priceAnalysis.averagePrice.toFixed(2)}€`);
       
       this.showAveragePriceDisplay();
+      this.updateAllPriceIndicators();
       this.addPriceButtons();
       this.updateKpiStats();
     } else {
@@ -771,35 +781,31 @@ class WallapopFilter {
     const existingIndicators = document.querySelectorAll('.wallapop-price-indicator');
     
     existingIndicators.forEach((indicator, index) => {
-      // Encontrar el elemento de precio asociado
-      const priceElement = indicator.previousElementSibling;
-      if (priceElement && priceElement.tagName === 'STRONG') {
-        const price = this.extractPrice(priceElement);
-        
-        if (price && price > 0 && price <= this.PRICE_MAX) {
-          const diff = price - this.priceAnalysis.averagePrice;
-          let indicatorText = '';
-          let indicatorColor = '';
-          
-          if (diff > 0) {
-            indicatorText = `+${diff.toFixed(0)}€`;
-            indicatorColor = '#ff4757'; // Rojo
-          } else if (diff < 0) {
-            indicatorText = `${diff.toFixed(0)}€`;
-            indicatorColor = '#2ed573'; // Verde
-          } else {
-            indicatorText = '=';
-            indicatorColor = '#ffd43b'; // Amarillo
-          }
-          
-          // Actualizar el indicador
-          indicator.textContent = indicatorText;
-          indicator.style.setProperty('background', indicatorColor, 'important');
-          indicator.title = `Comparado con el promedio de ${this.priceAnalysis.averagePrice.toFixed(2)}€`;
-          
-          console.log(`   🔄 Indicador ${index + 1} actualizado: ${price}€ - ${indicatorText} (${indicatorColor})`);
-        }
+      // El precio se guarda en el propio indicador al crearlo
+      const price = parseFloat(indicator.dataset.price);
+      if (!price || price <= 0 || price > this.PRICE_MAX) return;
+      
+      const diff = price - this.priceAnalysis.averagePrice;
+      let indicatorText = '';
+      let indicatorColor = '';
+      
+      if (diff > 0) {
+        indicatorText = `+${diff.toFixed(0)}€`;
+        indicatorColor = '#ff4757'; // Rojo
+      } else if (diff < 0) {
+        indicatorText = `${diff.toFixed(0)}€`;
+        indicatorColor = '#2ed573'; // Verde
+      } else {
+        indicatorText = '=';
+        indicatorColor = '#ffd43b'; // Amarillo
       }
+      
+      // Actualizar el indicador
+      indicator.textContent = indicatorText;
+      indicator.style.setProperty('background', indicatorColor, 'important');
+      indicator.title = `Comparado con el promedio de ${this.priceAnalysis.averagePrice.toFixed(2)}€`;
+      
+      console.log(`   🔄 Indicador ${index + 1} actualizado: ${price}€ - ${indicatorText} (${indicatorColor})`);
     });
     
     console.log(`✅ ${existingIndicators.length} indicadores de precio actualizados`);
@@ -918,7 +924,7 @@ class WallapopFilter {
     let lastPriceCount = 0;
     let lastProductCount = 0;
 
-    window.addEventListener('scroll', () => {
+    this.onScroll = () => {
       if (scrollTimeout) {
         clearTimeout(scrollTimeout);
       }
@@ -957,7 +963,8 @@ class WallapopFilter {
         lastPriceCount = currentPriceCount;
         lastProductCount = currentProductCount;
       }, 1000); // Esperar 1 segundo después de parar de hacer scroll
-    });
+    };
+    window.addEventListener('scroll', this.onScroll);
   }
 
   // Limpiar análisis anterior (solo elementos duplicados, no los macheados)
@@ -980,12 +987,13 @@ class WallapopFilter {
 
   // Configurar listener de API
   setupApiListener() {
-    window.addEventListener('message', (event) => {
+    this.onWindowMessage = (event) => {
+      // Solo aceptar mensajes de la propia página (inject.js)
+      if (event.source !== window || !event.data || typeof event.data !== 'object') return;
       console.log('📨 Mensaje recibido:', event.data.type, event.data);
       
       if (event.data.type === 'WALLAPOP_USER_IDS') {
-        // Actualizar contadores
-        this.kpiStats.totalItems += event.data.count;
+        // Solo autores únicos: los items se cuentan en WALLAPOP_ITEMS_MATCHING
         event.data.userIds.forEach(userId => this.userBlocking.uniqueAuthors.add(userId));
         this.updateKpiStats();
       }
@@ -1024,7 +1032,8 @@ class WallapopFilter {
           }
         }, 8000); // Esperar 8 segundos adicionales
       }
-    });
+    };
+    window.addEventListener('message', this.onWindowMessage);
   }
 
   // Matching de items con HTML usando URLs de imagen
@@ -1373,8 +1382,7 @@ class WallapopFilter {
       
       // Recalcular promedio
       if (this.priceAnalysis.allPrices.length > 0) {
-        const uniquePrices = [...new Set(this.priceAnalysis.allPrices)];
-        this.priceAnalysis.averagePrice = uniquePrices.reduce((sum, price) => sum + price, 0) / uniquePrices.length;
+        this.priceAnalysis.averagePrice = this.priceAnalysis.allPrices.reduce((sum, price) => sum + price, 0) / this.priceAnalysis.allPrices.length;
         
         console.log(`📊 Nuevo precio promedio: ${this.priceAnalysis.averagePrice.toFixed(2)}€ (${this.priceAnalysis.allPrices.length} items restantes)`);
         
@@ -1412,12 +1420,7 @@ class WallapopFilter {
   // Actualizar estadísticas KPI
   updateKpiStats() {
     if (this.filterIndicator) {
-      // Actualizar contadores en el sidebar existente
-      const resultsElement = this.filterIndicator.querySelector('#sidebar-results-count');
-      if (resultsElement) {
-        resultsElement.textContent = `${this.kpiStats.totalItems}`;
-      }
-      
+      // "Productos encontrados" lo gestiona updateFilterIndicator() con el recuento del DOM
       // Agregar nuevas estadísticas si no existen
       this.addKpiStatsToSidebar();
     }
@@ -1472,10 +1475,11 @@ class WallapopFilter {
 
 
   addFilterIndicator() {
-    // Remover indicador existente si existe
+    // Remover indicador existente si existe (incluidos restos de instancias anteriores)
     if (this.filterIndicator) {
       this.filterIndicator.remove();
     }
+    document.querySelectorAll('#wallapop-filter-sidebar, #wallapop-filter-tab').forEach(el => el.remove());
 
     this.filterIndicator = document.createElement('div');
     this.filterIndicator.id = 'wallapop-filter-sidebar';
@@ -1775,7 +1779,7 @@ class WallapopFilter {
     this.setupSidebarEvents();
     
     // Actualizar estado cada 2 segundos
-    setInterval(() => {
+    this.sidebarInterval = setInterval(() => {
       if (this.isInitialized) {
         // Verificar validez del contexto periódicamente
         this.checkContextValidity();
@@ -2034,7 +2038,7 @@ class WallapopFilter {
   setupMessageListener() {
     try {
       // Escuchar mensajes del popup y responder siempre
-      chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      this.onRuntimeMessage = (request, sender, sendResponse) => {
         console.log('📨 Mensaje recibido en content script:', request);
         console.log('📨 Sender:', sender);
         
@@ -2064,7 +2068,8 @@ class WallapopFilter {
         
         // IMPORTANTE: Siempre devolver true para mantener el canal abierto
         return true;
-      });
+      };
+      chrome.runtime.onMessage.addListener(this.onRuntimeMessage);
       
       console.log('📡 Message listener configurado');
       
