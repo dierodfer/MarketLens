@@ -43,8 +43,9 @@
 | 📈 | **Análisis de precios** | Calcula el precio medio y el rango de la búsqueda, y marca en cada anuncio cuánto está por encima (rojo) o por debajo (verde) de la media. |
 | 🚫 | **Bloqueo de vendedores** | Muestra el ID del vendedor en cada anuncio (clic para copiarlo) y permite ocultar todos sus anuncios de una vez. |
 | ✕ | **Ocultar anuncios sueltos** | Quita de la página un anuncio concreto y recalcula la media sin él. |
+| 👁 | **Marcar como visto** | Cubre el anuncio con un velo gris sin quitarlo de la página. La marca se guarda: sigue ahí al recargar o repetir la búsqueda. |
 | 🌗 | **Modo claro y oscuro** | El panel sigue la apariencia del sistema. |
-| 💾 | **Preferencias guardadas** | El filtro elegido y el estado del interruptor se recuerdan entre sesiones. |
+| 💾 | **Preferencias guardadas** | El filtro elegido, el estado del interruptor y los anuncios vistos se recuerdan entre sesiones. |
 
 ## Instalación
 
@@ -77,7 +78,9 @@ Probada en Chrome; debería funcionar en otros navegadores basados en Chromium (
 | Pestaña lateral | Borde derecho | Abre el panel. El punto indica el estado: verde activo, gris en pausa. |
 | Filtrado automático | Panel | Pausa el filtro sin perder la selección. |
 | Pastilla de precio | Junto al precio de cada anuncio | Diferencia respecto a la media. |
+| Botón del ojo | Esquina superior derecha de cada anuncio | Marca o desmarca el anuncio como visto (velo gris). Se puede deshacer pulsando de nuevo. |
 | Chip del vendedor | Bajo el título | Clic para copiar su ID; **Bloquear** oculta todos sus anuncios. |
+| Vistos | Panel | Cuántos anuncios vistos hay en la página y **Borrar** para quitar todas las marcas. |
 | Precio medio | Esquina inferior izquierda | Media y número de anuncios analizados. |
 | Icono de la barra | Barra de Chrome | Estado de la conexión con la pestaña de Wallapop. |
 
@@ -126,6 +129,7 @@ Qué se comprueba:
 - Los filtros muestran los anuncios correctos y la preferencia sobrevive a una recarga.
 - La media, el rango y las diferencias de precio son correctos y se recalculan al cargar más anuncios.
 - Cada anuncio muestra su vendedor según la API; bloquearlo oculta sus anuncios y actualiza la media.
+- Marcar como visto aplica el velo, no oculta ni cambia la media, respeta el filtro, sobrevive a una recarga y se puede borrar desde el panel.
 - Los diálogos son propios de la extensión, nunca `confirm()` del navegador.
 - La página no lanza errores de JavaScript.
 

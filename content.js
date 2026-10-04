@@ -7,6 +7,7 @@ const ML_SVG = (size, body, extra = '') =>
 const ML_ICONS = {
   logo: (size = 22) => ML_SVG(size, '<circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5L21 21"></path><path d="M7.5 12.5l2-2 1.8 1.5 2.4-3"></path>'),
   close: ML_SVG(12, '<path d="M5 5l14 14M19 5L5 19"></path>', ' stroke-width="2.6"'),
+  eye: ML_SVG(14, '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle>', ' stroke-width="2.2"'),
   trend: ML_SVG(16, '<path d="M3 17l6-6 4 4 8-8"></path><path d="M15 7h6v6"></path>'),
   book: ML_SVG(18, '<path d="M3 4.5h6a3 3 0 013 3V20a2 2 0 00-2-2H3z"></path><path d="M21 4.5h-6a3 3 0 00-3 3V20a2 2 0 012-2h7z"></path>', ' stroke-width="1.7"'),
   coffee: ML_SVG(18, '<path d="M4 9h12v5a5 5 0 01-5 5H9a5 5 0 01-5-5z"></path><path d="M16 10h1.5a2.5 2.5 0 010 5H16"></path><path d="M8 3.5v2M12 3.5v2"></path>', ' stroke-width="1.7"'),
@@ -24,6 +25,10 @@ class WallapopFilter {
 
   // Constante para límite de precio máximo
   PRICE_MAX = 100000;
+
+  // Anuncios marcados como vistos (ruta /item/...) y máximo que se recuerda
+  seenItems = new Set();
+  SEEN_MAX = 5000;
 
   // Flag para detectar si el contexto está invalidado
   contextInvalidated = false;
@@ -218,6 +223,9 @@ class WallapopFilter {
       try { chrome.runtime.onMessage.removeListener(this.onRuntimeMessage); } catch (e) {}
     }
     
+    // Quitar botones y velos de "visto": la instancia nueva los vuelve a crear
+    document.querySelectorAll('.ml-seen-btn, .ml-seen-veil').forEach((element) => element.remove());
+    
     // Remover sidebar del DOM
     if (this.filterIndicator) {
       this.filterIndicator.remove();
@@ -270,9 +278,13 @@ class WallapopFilter {
 
   async loadSettings() {
     try {
-      const result = await chrome.storage.local.get(['filterMode', 'extensionEnabled']);
+      const result = await chrome.storage.local.get(['filterMode', 'extensionEnabled', 'seenItems']);
       this.filterMode = result.filterMode || 'all';
       this.extensionEnabled = result.extensionEnabled !== undefined ? result.extensionEnabled : true;
+      if (Array.isArray(result.seenItems)) {
+        this.seenItems = new Set(result.seenItems.filter((key) => typeof key === 'string'));
+        this.refreshSeenMarks();
+      }
       console.log(`📋 Configuración cargada - Filtro: ${this.filterMode}, Activa: ${this.extensionEnabled}`);
       
       // Actualizar toggle en el sidebar si existe
@@ -504,11 +516,15 @@ class WallapopFilter {
   }
 
   // Helper para crear botón de ocultar anuncio
+  // Evita el recorte de los botones y asegura el apilado de la tarjeta
+  prepareCardContainer(card) {
+    if (getComputedStyle(card).position === 'static') card.style.position = 'relative';
+    card.style.overflow = 'visible';
+    card.style.zIndex = '2';
+  }
+
   ensureDeleteButton(itemContainer, price) {
-    // evita clipping y asegura stacking
-    itemContainer.style.position = itemContainer.style.position || 'relative';
-    itemContainer.style.overflow = 'visible';
-    itemContainer.style.zIndex = '2';
+    this.prepareCardContainer(itemContainer);
 
     if (itemContainer.querySelector('.wallapop-delete-ad-btn')) return;
 
@@ -541,6 +557,124 @@ class WallapopFilter {
 
     priceElement.parentNode.insertBefore(indicator, priceElement.nextSibling);
     console.log(`✅ Indicador agregado: ${price}€ - ${indicator.textContent}`);
+  }
+
+  // ===== MARCAR COMO VISTO =====
+
+  // Clave estable de un anuncio: la ruta de su enlace (/item/...)
+  getItemKey(element) {
+    let link = element.closest('a[href*="/item/"]');
+    link ??= element.querySelector('a[href*="/item/"]');
+    if (!link) return null;
+    try {
+      return new URL(link.href, globalThis.location.origin).pathname;
+    } catch {
+      return null;
+    }
+  }
+
+  // Botón con un ojo: marca o desmarca el anuncio como visto
+  ensureSeenButton(itemContainer) {
+    this.prepareCardContainer(itemContainer);
+    if (itemContainer.querySelector(':scope > .ml-seen-btn')) return;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ml-seen-btn';
+    btn.innerHTML = `<span class="ml-hide-circle">${ML_ICONS.eye}</span>`;
+    btn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      this.toggleSeen(itemContainer);
+    });
+
+    itemContainer.appendChild(btn);
+    this.syncSeenCard(itemContainer);
+  }
+
+  // Refleja en una tarjeta si está vista: velo gris por encima y estado del botón
+  syncSeenCard(card) {
+    const key = this.getItemKey(card);
+    const seen = key !== null && this.seenItems.has(key);
+    card.classList.toggle('ml-seen', seen);
+
+    const veil = card.querySelector(':scope > .ml-seen-veil');
+    if (seen && !veil) {
+      this.prepareCardContainer(card);
+      const newVeil = document.createElement('span');
+      newVeil.className = 'ml-seen-veil';
+      newVeil.setAttribute('aria-hidden', 'true');
+      card.appendChild(newVeil);
+    } else if (!seen) {
+      veil?.remove();
+    }
+
+    const btn = card.querySelector(':scope > .ml-seen-btn');
+    if (btn) {
+      const label = seen ? 'Quitar marca de visto' : 'Marcar como visto';
+      btn.title = label;
+      btn.setAttribute('aria-label', label);
+      btn.setAttribute('aria-pressed', String(seen));
+    }
+    return seen;
+  }
+
+  // Actualiza todas las tarjetas y el contador del panel
+  refreshSeenMarks() {
+    let seenOnPage = 0;
+    this.getSearchResults().forEach((card) => {
+      if (this.syncSeenCard(card)) seenOnPage++;
+    });
+
+    const count = this.filterIndicator?.querySelector('#ml-seen-count');
+    if (count) count.textContent = `${seenOnPage} en esta página`;
+    const clearButton = this.filterIndicator?.querySelector('#ml-clear-seen');
+    if (clearButton) clearButton.disabled = this.seenItems.size === 0;
+  }
+
+  toggleSeen(itemContainer) {
+    const key = this.getItemKey(itemContainer);
+    if (key === null) return;
+
+    if (this.seenItems.has(key)) {
+      this.seenItems.delete(key);
+    } else {
+      this.seenItems.add(key);
+      // Al llegar al máximo se olvidan las marcas más antiguas
+      while (this.seenItems.size > this.SEEN_MAX) {
+        this.seenItems.delete(this.seenItems.values().next().value);
+      }
+    }
+
+    this.refreshSeenMarks();
+    this.saveSeenItems();
+  }
+
+  saveSeenItems() {
+    const warn = (error) => console.warn('⚠️ No se pudieron guardar los vistos:', error.message);
+    try {
+      chrome.storage.local.set({ seenItems: [...this.seenItems] }).catch(warn);
+    } catch (error) {
+      warn(error);
+    }
+  }
+
+  async clearSeenItems() {
+    const total = this.seenItems.size;
+    if (total === 0) return;
+
+    const confirmed = await this.confirmDialog({
+      title: '¿Borrar todos los vistos?',
+      message: total === 1
+        ? 'Se quitará la marca de 1 anuncio.'
+        : `Se quitará la marca de ${total} anuncios, también de otras búsquedas.`,
+      confirmLabel: 'Borrar'
+    });
+    if (!confirmed) return;
+
+    this.seenItems.clear();
+    this.refreshSeenMarks();
+    this.saveSeenItems();
+    this.showNotification('Marcas de visto borradas');
   }
 
   // Pinta la diferencia de un precio respecto a la media
@@ -680,6 +814,9 @@ class WallapopFilter {
           this.ensureDeleteButton(itemContainer, price);
           deleteButtonsAdded++;
         }
+
+        // Botón de "visto": en todas las tarjetas
+        if (itemContainer) this.ensureSeenButton(itemContainer);
 
         // 1) Indicador: solo si ya hay media calculada
         if (this.priceAnalysis.allPrices.length > 0 && !itemContainer.querySelector('.wallapop-price-indicator')) {
@@ -1484,6 +1621,13 @@ class WallapopFilter {
           <span>Vendedores bloqueados</span>
           <span class="ml-list__value" id="ml-blocked">0 · 0 anuncios</span>
         </div>
+        <div class="ml-list__row">
+          <span>Vistos</span>
+          <span class="ml-list__value ml-list__actions">
+            <span id="ml-seen-count">0 en esta página</span>
+            <button type="button" class="ml-text-btn" id="ml-clear-seen" disabled>Borrar</button>
+          </span>
+        </div>
       </div>
 
       <div class="ml-spacer"></div>
@@ -1575,6 +1719,7 @@ class WallapopFilter {
     });
 
     this.updateStatusIndicators();
+    this.refreshSeenMarks();
   }
 
   // Punto de estado de la pestaña: verde activo, gris en pausa
@@ -1599,6 +1744,11 @@ class WallapopFilter {
 
     if (toggleBtn) toggleBtn.addEventListener('click', () => setOpen(false, true));
     if (this.sidebarTab) this.sidebarTab.addEventListener('click', () => setOpen(true, true));
+
+    // Borrar todas las marcas de visto
+    this.filterIndicator.querySelector('#ml-clear-seen')?.addEventListener('click', () => {
+      this.clearSeenItems().catch((error) => console.warn('⚠️ Error borrando vistos:', error.message));
+    });
 
     // Interruptor de filtrado automático
     const extensionToggle = this.filterIndicator.querySelector('#extension-toggle');

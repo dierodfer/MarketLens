@@ -339,6 +339,29 @@
   font-weight: 600;
 }
 
+.ml-list__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ml-text-btn {
+  border: none;
+  background: transparent;
+  color: var(--ml-link);
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 32px;
+  padding: 0 0 0 8px;
+  cursor: pointer;
+}
+
+.ml-text-btn:disabled {
+  color: var(--ml-text-2);
+  opacity: 0.5;
+  cursor: default;
+}
+
 .ml-spacer {
   flex-grow: 1;
 }
@@ -496,7 +519,8 @@
   color: #b42318 !important;
 }
 
-.wallapop-delete-ad-btn {
+.wallapop-delete-ad-btn,
+.ml-seen-btn {
   position: absolute !important;
   top: 2px !important;
   right: 2px !important;
@@ -512,7 +536,12 @@
   justify-content: center !important;
 }
 
-.wallapop-delete-ad-btn .ml-hide-circle {
+.ml-seen-btn {
+  right: 46px !important;
+}
+
+.wallapop-delete-ad-btn .ml-hide-circle,
+.ml-seen-btn .ml-hide-circle {
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -527,8 +556,24 @@
   transition: transform 0.15s ease;
 }
 
-.wallapop-delete-ad-btn:hover .ml-hide-circle {
+.wallapop-delete-ad-btn:hover .ml-hide-circle,
+.ml-seen-btn:hover .ml-hide-circle {
   transform: scale(1.08);
+}
+
+/* Anuncio visto: el botón queda marcado y un velo gris cubre la tarjeta */
+.ml-seen-btn[aria-pressed="true"] .ml-hide-circle {
+  background: #0071e3;
+  color: #ffffff;
+}
+
+.ml-seen-veil {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+  border-radius: inherit;
+  background: rgba(110, 110, 115, 0.58) !important;
+  pointer-events: none !important;
 }
 
 .wallapop-user-id-container {

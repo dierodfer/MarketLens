@@ -152,6 +152,87 @@ test.describe('Bloqueo de vendedores', () => {
   });
 });
 
+test.describe('Marcar como visto', () => {
+  const seenButton = (page, id) => card(page, id).getByRole('button', { name: /visto/ });
+
+  test('marca el anuncio con un velo gris por encima y se puede deshacer', async ({ search: page }) => {
+    await expect(card(page, 'a1').locator('.ml-seen-veil')).toHaveCount(0);
+
+    await seenButton(page, 'a1').click();
+    await expect(card(page, 'a1')).toHaveClass(/ml-seen/);
+    await expect(seenButton(page, 'a1')).toHaveAttribute('aria-pressed', 'true');
+    await expect(seenButton(page, 'a1')).toHaveAccessibleName('Quitar marca de visto');
+
+    // Velo gris semitransparente que cubre toda la tarjeta y no bloquea los clics
+    const veil = card(page, 'a1').locator('.ml-seen-veil');
+    await expect(veil).toHaveCount(1);
+    await expect(veil).toHaveCSS('background-color', /^rgba\(110, 110, 115, 0\.\d+\)$/);
+    await expect(veil).toHaveCSS('pointer-events', 'none');
+    const [cardBox, veilBox] = await Promise.all([card(page, 'a1').boundingBox(), veil.boundingBox()]);
+    expect(veilBox).toEqual(cardBox);
+
+    // Las demás tarjetas no cambian
+    await expect(card(page, 'a2')).not.toHaveClass(/ml-seen/);
+
+    // Volver a pulsar quita la marca
+    await seenButton(page, 'a1').click();
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-seen/);
+    await expect(card(page, 'a1').locator('.ml-seen-veil')).toHaveCount(0);
+    await expect(seenButton(page, 'a1')).toHaveAccessibleName('Marcar como visto');
+  });
+
+  test('a diferencia de ocultar, el anuncio sigue en la página y respeta el filtro', async ({ search: page }) => {
+    await seenButton(page, 'a2').click();
+    await expect(card(page, 'a2')).toHaveCount(1);
+
+    await page.locator('#ml-tab').click();
+    await page.getByRole('button', { name: 'Reservados', exact: true }).click();
+    expect(await visibleIds(page)).toEqual(['a2', 'a4']);
+    await expect(card(page, 'a2')).toHaveClass(/ml-seen/);
+  });
+
+  test('las marcas sobreviven a una recarga', async ({ search: page }) => {
+    await seenButton(page, 'a3').click();
+    await seenButton(page, 'a4').click();
+
+    await page.reload();
+    await expect(card(page, 'a3')).toHaveClass(/ml-seen/, { timeout: 10_000 });
+    await expect(card(page, 'a4')).toHaveClass(/ml-seen/);
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-seen/);
+  });
+
+  test('el panel cuenta los vistos y permite borrarlos todos', async ({ search: page }) => {
+    await page.locator('#ml-tab').click();
+    await expect(page.locator('#ml-seen-count')).toHaveText('0 en esta página');
+    await expect(page.locator('#ml-clear-seen')).toBeDisabled();
+
+    await seenButton(page, 'a1').click();
+    await seenButton(page, 'a2').click();
+    await expect(page.locator('#ml-seen-count')).toHaveText('2 en esta página');
+    await expect(page.locator('#ml-clear-seen')).toBeEnabled();
+
+    await page.locator('#ml-clear-seen').click();
+    const dialog = page.getByRole('alertdialog');
+    await expect(dialog).toContainText('Se quitará la marca de 2 anuncios');
+
+    // Cancelar no borra nada
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(page.locator('.ml-seen-veil')).toHaveCount(2);
+
+    await page.locator('#ml-clear-seen').click();
+    await dialog.getByRole('button', { name: 'Borrar' }).click();
+    await expect(page.locator('.ml-seen-veil')).toHaveCount(0);
+    await expect(page.locator('#ml-seen-count')).toHaveText('0 en esta página');
+    await expect(page.locator('#ml-clear-seen')).toBeDisabled();
+  });
+
+  test('marcar uno como visto no cambia la media de precios', async ({ search: page }) => {
+    await seenButton(page, 'a4').click();
+    await expect(page.locator('#wallapop-average-price-display')).toContainText('225 €');
+    await expect(page.locator('#wallapop-average-price-display')).toContainText('4 anuncios');
+  });
+});
+
 test.describe('Popup', () => {
   test('muestra nombre y versión', async ({ context, extensionId }) => {
     const popup = await context.newPage();
@@ -170,6 +251,7 @@ test.describe('Capturas', () => {
       test.use({ colorScheme: scheme });
 
       test(`panel abierto (${scheme})`, async ({ search: page }, testInfo) => {
+        await card(page, 'a1').getByRole('button', { name: 'Marcar como visto' }).click();
         await page.locator('#ml-tab').click();
         await page.getByRole('button', { name: 'Disponibles', exact: true }).click();
         await page.waitForTimeout(400);
