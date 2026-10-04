@@ -1,5 +1,20 @@
-// Wallapop Filter Extension - Content Script FINAL
-// Versión que usa el método correcto para ocultar/mostrar productos
+// MarketLens - Content Script
+// Filtra, analiza precios y bloquea vendedores en los resultados de Wallapop
+
+// Iconos de línea (SVG inline, heredan el color del texto)
+const ML_SVG = (size, body, extra = '') =>
+  `<svg class="ml-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${body}</svg>`;
+const ML_ICONS = {
+  logo: (size = 22) => ML_SVG(size, '<circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5L21 21"></path><path d="M7.5 12.5l2-2 1.8 1.5 2.4-3"></path>'),
+  close: ML_SVG(12, '<path d="M5 5l14 14M19 5L5 19"></path>', ' stroke-width="2.6"'),
+  trend: ML_SVG(16, '<path d="M3 17l6-6 4 4 8-8"></path><path d="M15 7h6v6"></path>'),
+  book: ML_SVG(18, '<path d="M3 4.5h6a3 3 0 013 3V20a2 2 0 00-2-2H3z"></path><path d="M21 4.5h-6a3 3 0 00-3 3V20a2 2 0 012-2h7z"></path>', ' stroke-width="1.7"'),
+  coffee: ML_SVG(18, '<path d="M4 9h12v5a5 5 0 01-5 5H9a5 5 0 01-5-5z"></path><path d="M16 10h1.5a2.5 2.5 0 010 5H16"></path><path d="M8 3.5v2M12 3.5v2"></path>', ' stroke-width="1.7"'),
+  user: ML_SVG(11, '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.2-4 4.3-6 8-6s6.8 2 8 6"></path>', ' stroke-width="2.4"'),
+  check: ML_SVG(14, '<path d="M5 12.5l4.5 4.5L19 7"></path>', ' stroke-width="2.6"'),
+  alert: ML_SVG(14, '<circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5v.5"></path>', ' stroke-width="2.4"')
+};
+
 class WallapopFilter {
   constructor() {
     this.filterMode = 'all'; // 'all', 'reserved', 'available'
@@ -58,63 +73,6 @@ class WallapopFilter {
       .rs-visible { display: block !important; }
     `;
     document.head.appendChild(style);
-  }
-
-  // Helper para obtener URLs de iconos de forma segura
-  getIconURL(iconPath) {
-    // Verificar si podemos usar Chrome APIs de forma segura
-    if (!this.canUseChromeAPIs()) {
-      return this.getFallbackSVG(iconPath);
-    }
-    
-    // Solo usar iconos que están en la carpeta icons/
-    const validIcons = [
-      'icons/logo.png',
-      'icons/mafiaIcon.png',
-      'icons/icon16.png',
-      'icons/icon32.png',
-      'icons/icon48.png',
-      'icons/icon128.png',
-      'icons/icon16.svg',
-      'icons/icon32.svg',
-      'icons/icon48.svg',
-      'icons/icon128.svg',
-      'icons/bmc-brand-icon.svg',
-      'icons/github-mark-white.png',
-      'icons/github-mark-white.svg',
-      'icons/iconHaunt.png'
-    ];
-    
-    // Verificar que el icono esté en la lista de iconos válidos
-    if (!validIcons.includes(iconPath)) {
-      console.warn('⚠️ Icono no válido:', iconPath, 'usando logo.png por defecto');
-      iconPath = 'icons/logo.png';
-    }
-    
-    try {
-      const url = chrome.runtime.getURL(iconPath);
-      // Verificar si la URL es válida
-      if (!url || url.includes('undefined')) {
-        throw new Error('URL inválida generada');
-      }
-      return url;
-    } catch (error) {
-      console.warn('⚠️ Error obteniendo URL del icono:', error.message);
-      // Marcar contexto como invalidado para futuras llamadas
-      this.contextInvalidated = true;
-      return this.getFallbackSVG(iconPath);
-    }
-  }
-
-  // Fallback SVG para cuando chrome.runtime no está disponible
-  getFallbackSVG(iconPath) {
-    const svgMap = {
-      'icons/logo.png': 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDIiIGhlaWdodD0iNDIiIHZpZXdCb3g9IjAgMCA0MiA0MiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjEiIGN5PSIyMSIgcj0iMjEiIGZpbGw9IiMwMDdiZmYiLz4KPHN2ZyB4PSI4IiB5PSI4IiB3aWR0aD0iMjYiIGhlaWdodD0iMjYiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+CjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+Cjwvc3ZnPgo=',
-      'icons/mafiaIcon.png': 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDIiIGhlaWdodD0iNDIiIHZpZXdCb3g9IjAgMCA0MiA0MiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjEiIGN5PSIyMSIgcj0iMjEiIGZpbGw9IiNkYzM1NDUiLz4KPHN2ZyB4PSI4IiB5PSI4IiB3aWR0aD0iMjYiIGhlaWdodD0iMjYiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+CjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMSA1aDJ2Nmg0djJoLTZ2LTZ6IiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4KPC9zdmc+Cg==',
-      'icons/iconHaunt.png': 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDIiIGhlaWdodD0iNDIiIHZpZXdCb3g9IjAgMCA0MiA0MiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjEiIGN5PSIyMSIgcj0iMjEiIGZpbGw9IiM2NjY2NjYiLz4KPHN2ZyB4PSI4IiB5PSI4IiB3aWR0aD0iMjYiIGhlaWdodD0iMjYiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+CjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMSA1aDJ2Nmg0djJoLTZ2LTZ6IiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4KPC9zdmc+Cg=='
-    };
-    
-    return svgMap[iconPath] || svgMap['icons/logo.png'];
   }
 
   // Helper para enviar mensajes de forma segura
@@ -196,7 +154,7 @@ class WallapopFilter {
     
     try {
       // Intentar una operación simple de Chrome API
-      chrome.runtime.getURL('icons/logo.png');
+      chrome.runtime.getURL('icons/icon16.png');
       return true;
     } catch (error) {
       console.warn('⚠️ Contexto invalidado detectado, activando modo fallback');
@@ -282,7 +240,7 @@ class WallapopFilter {
   }
 
   init() {
-    console.log('🚀 Reserve Sniper iniciado');
+    console.log('🚀 MarketLens iniciado');
     
     // Verificar validez del contexto al inicializar
     this.checkContextValidity();
@@ -320,20 +278,8 @@ class WallapopFilter {
       // Actualizar toggle en el sidebar si existe
       setTimeout(() => {
         const toggle = document.querySelector('#extension-toggle');
-        if (toggle) {
-          toggle.checked = this.extensionEnabled;
-          const slider = document.querySelector('#toggle-slider');
-          const knob = document.querySelector('#toggle-knob');
-          if (slider && knob) {
-            if (this.extensionEnabled) {
-              slider.style.background = '#4CAF50';
-              knob.style.left = '33px';
-            } else {
-              slider.style.background = '#ccc';
-              knob.style.left = '3px';
-            }
-          }
-        }
+        if (toggle) toggle.checked = this.extensionEnabled;
+        this.updateStatusIndicators();
       }, 100);
     } catch (error) {
       console.log('⚠️ No se pudo cargar configuración, usando valores por defecto');
@@ -553,7 +499,7 @@ class WallapopFilter {
     return null;
   }
 
-  // Helper para crear botón de eliminar anuncio
+  // Helper para crear botón de ocultar anuncio
   ensureDeleteButton(itemContainer, price) {
     // evita clipping y asegura stacking
     itemContainer.style.position = itemContainer.style.position || 'relative';
@@ -563,52 +509,51 @@ class WallapopFilter {
     if (itemContainer.querySelector('.wallapop-delete-ad-btn')) return;
 
     const btn = document.createElement('button');
+    btn.type = 'button';
     btn.className = 'wallapop-delete-ad-btn';
-    btn.textContent = '×';
-    btn.title = `Eliminar este anuncio (${price}€)`;
-    btn.style.cssText = `
-      position:absolute; top:6px; right:6px;
-      background:linear-gradient(135deg,#ff6b6b 0%,#ee5a52 100%);
-      color:#fff; border:none; border-radius:50%;
-      width:24px;height:24px;font-size:14px;font-weight:700;
-      cursor:pointer; display:flex;align-items:center;justify-content:center;
-      z-index:999; box-shadow:0 2px 8px rgba(0,0,0,.3); transition:transform .15s;
-      pointer-events:auto;
-    `;
-    btn.addEventListener('click', (e) => {
+    btn.title = `Ocultar este anuncio (${this.formatPrice(price)})`;
+    btn.setAttribute('aria-label', btn.title);
+    btn.innerHTML = `<span class="ml-hide-circle">${ML_ICONS.close}</span>`;
+    btn.addEventListener('click', async (e) => {
       e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-      if (confirm(`¿Eliminar este anuncio de ${price}€?`)) this.hideIndividualAd(itemContainer);
+      const confirmed = await this.confirmDialog({
+        title: '¿Ocultar este anuncio?',
+        message: `Se quitará de esta página (${this.formatPrice(price)}).`,
+        confirmLabel: 'Ocultar'
+      });
+      if (confirmed) this.hideIndividualAd(itemContainer);
     });
-    btn.addEventListener('mouseenter', () => btn.style.transform = 'scale(1.08)');
-    btn.addEventListener('mouseleave', () => btn.style.transform = 'scale(1)');
 
     itemContainer.appendChild(btn);
-    console.log(`✅ Botón de eliminar agregado para anuncio de ${price}€`);
+    console.log(`✅ Botón de ocultar agregado para anuncio de ${price}€`);
   }
 
   // Helper para insertar indicador de precio
   insertPriceIndicator(priceElement, price) {
-    const diff = price - this.priceAnalysis.averagePrice;
     const indicator = document.createElement('span');
     indicator.className = 'wallapop-price-indicator';
     indicator.dataset.price = price;
-
-    let text = '=', color = '#ffd43b';
-    if (diff > 0) { text = `+${diff.toFixed(0)}€`; color = '#ff4757'; }
-    if (diff < 0) { text = `${diff.toFixed(0)}€`;  color = '#2ed573'; }
-
-    indicator.textContent = text;
-    indicator.title = `Comparado con ${this.priceAnalysis.averagePrice.toFixed(2)}€`;
-    indicator.style.cssText = `
-      background:${color} !important; color:#fff !important;
-      padding:2px 6px !important; border-radius:10px !important;
-      font-size:10px !important; font-weight:700 !important; margin-left:4px !important;
-      display:inline-block !important; box-shadow:0 1px 3px rgba(0,0,0,.2) !important;
-      position:relative !important; z-index:1 !important;
-    `;
+    this.renderPriceIndicator(indicator, price);
 
     priceElement.parentNode.insertBefore(indicator, priceElement.nextSibling);
-    console.log(`✅ Indicador agregado: ${price}€ - ${text} (${color})`);
+    console.log(`✅ Indicador agregado: ${price}€ - ${indicator.textContent}`);
+  }
+
+  // Pinta la diferencia de un precio respecto a la media
+  renderPriceIndicator(indicator, price) {
+    const average = this.priceAnalysis.averagePrice;
+    const diff = Math.round(price - average);
+
+    indicator.classList.toggle('ml-above', diff > 0);
+    indicator.classList.toggle('ml-below', diff < 0);
+    indicator.textContent = diff === 0
+      ? '= media'
+      : `${diff > 0 ? '+' : '−'}${Math.abs(diff).toLocaleString('es-ES', { useGrouping: 'always' })} €`;
+    indicator.title = `Comparado con la media de ${this.formatPrice(average)}`;
+  }
+
+  formatPrice(value) {
+    return `${Math.round(value).toLocaleString('es-ES', { useGrouping: 'always' })} €`;
   }
 
   // Analizar precios de la página
@@ -664,37 +609,42 @@ class WallapopFilter {
 
   // Mostrar precio promedio
   showAveragePriceDisplay() {
-    console.log('💰 Mostrando precio promedio...');
-    
-    const existingDisplay = document.getElementById('wallapop-average-price-display');
-    if (existingDisplay) {
-      existingDisplay.remove();
+    let display = document.getElementById('wallapop-average-price-display');
+    if (!display) {
+      display = document.createElement('div');
+      display.id = 'wallapop-average-price-display';
+      display.className = 'ml-root';
+      display.setAttribute('role', 'status');
+      document.body.appendChild(display);
     }
-    
-    const averagePriceDisplay = document.createElement('div');
-    averagePriceDisplay.id = 'wallapop-average-price-display';
-    averagePriceDisplay.style.cssText = `
-      background: linear-gradient(135deg, rgb(102, 126, 234) 0%, rgb(118, 75, 162) 100%);
-      color: white;
-      padding: 6px 12px;
-      border-radius: 16px;
-      font-size: 11px;
-      font-weight: 600;
-      display: inline-block;
-      box-shadow: rgba(0, 0, 0, 0.2) 0px 2px 8px;
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-      z-index: 10000;
-      max-width: 200px;
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+
+    const count = this.priceAnalysis.allPrices.length;
+    display.innerHTML = `
+      <span class="ml-logo">${ML_ICONS.trend}</span>
+      <div class="ml-avg__text">
+        <span class="ml-avg__label">Precio medio</span>
+        <span class="ml-avg__value">${this.formatPrice(this.priceAnalysis.averagePrice)} <span class="ml-avg__count">· ${count} anuncios</span></span>
+      </div>
     `;
-    averagePriceDisplay.innerHTML = `💰 Precio promedio: <strong>${this.priceAnalysis.averagePrice.toFixed(2)}€</strong> (${this.priceAnalysis.allPrices.length} items)`;
-    
-    document.body.appendChild(averagePriceDisplay);
-    console.log('✅ Precio promedio insertado');
+
+    this.updatePriceSummary();
+    console.log('✅ Precio promedio actualizado');
+  }
+
+  // Actualizar precio medio y rango en el panel lateral
+  updatePriceSummary() {
+    const prices = this.priceAnalysis.allPrices;
+    const avgElement = document.getElementById('ml-avg-price');
+    const rangeElement = document.getElementById('ml-price-range');
+
+    if (avgElement) {
+      avgElement.textContent = prices.length ? this.formatPrice(this.priceAnalysis.averagePrice) : '–';
+    }
+    if (rangeElement) {
+      rangeElement.textContent = prices.length
+        ? `${this.formatPrice(Math.min(...prices))} – ${this.formatPrice(Math.max(...prices))}`
+        : '–';
+    }
   }
 
   // Agregar indicadores de comparación de precios y botones de eliminar
@@ -766,77 +716,110 @@ class WallapopFilter {
         if (averagePriceDisplay) {
           averagePriceDisplay.remove();
         }
+        this.updatePriceSummary();
       }
     }
     
     this.updateKpiStats();
-    this.showNotification(`Anuncio individual eliminado (${removedPrice}€)`);
+    this.showNotification(removedPrice ? `Anuncio de ${this.formatPrice(removedPrice)} ocultado` : 'Anuncio ocultado');
   }
 
   // Actualizar todos los indicadores de precio
   updateAllPriceIndicators() {
-    console.log('🔄 Actualizando todos los indicadores de precio...');
-    
-    // Buscar todos los indicadores existentes
     const existingIndicators = document.querySelectorAll('.wallapop-price-indicator');
-    
-    existingIndicators.forEach((indicator, index) => {
+
+    existingIndicators.forEach((indicator) => {
       // El precio se guarda en el propio indicador al crearlo
       const price = parseFloat(indicator.dataset.price);
       if (!price || price <= 0 || price > this.PRICE_MAX) return;
-      
-      const diff = price - this.priceAnalysis.averagePrice;
-      let indicatorText = '';
-      let indicatorColor = '';
-      
-      if (diff > 0) {
-        indicatorText = `+${diff.toFixed(0)}€`;
-        indicatorColor = '#ff4757'; // Rojo
-      } else if (diff < 0) {
-        indicatorText = `${diff.toFixed(0)}€`;
-        indicatorColor = '#2ed573'; // Verde
-      } else {
-        indicatorText = '=';
-        indicatorColor = '#ffd43b'; // Amarillo
-      }
-      
-      // Actualizar el indicador
-      indicator.textContent = indicatorText;
-      indicator.style.setProperty('background', indicatorColor, 'important');
-      indicator.title = `Comparado con el promedio de ${this.priceAnalysis.averagePrice.toFixed(2)}€`;
-      
-      console.log(`   🔄 Indicador ${index + 1} actualizado: ${price}€ - ${indicatorText} (${indicatorColor})`);
+      this.renderPriceIndicator(indicator, price);
     });
-    
+
     console.log(`✅ ${existingIndicators.length} indicadores de precio actualizados`);
   }
 
-  // Mostrar notificación
+  // Mostrar aviso flotante
   showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: ${type === 'error' ? '#ff6b6b' : '#51cf66'};
-      color: white;
-      padding: 12px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      z-index: 10001;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      animation: slideDown 0.3s ease;
-    `;
-    notification.textContent = message;
-    
-    document.body.appendChild(notification);
-    
+    const toast = document.createElement('div');
+    toast.className = 'ml-root ml-toast';
+    toast.setAttribute('role', 'status');
+
+    const isProblem = type === 'error' || type === 'warning';
+    const icon = document.createElement('span');
+    icon.style.color = isProblem ? '#ff9f0a' : '#30d158';
+    icon.innerHTML = isProblem ? ML_ICONS.alert : ML_ICONS.check;
+
+    const text = document.createElement('span');
+    text.textContent = message;
+
+    toast.append(icon, text);
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('ml-show'));
+
     setTimeout(() => {
-      notification.style.animation = 'slideUp 0.3s ease';
-      setTimeout(() => notification.remove(), 300);
+      toast.classList.remove('ml-show');
+      setTimeout(() => toast.remove(), 250);
     }, 3000);
+  }
+
+  // Diálogo de confirmación propio (sustituye a confirm())
+  confirmDialog({ title, message, confirmLabel = 'Aceptar' }) {
+    return new Promise((resolve) => {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'ml-root ml-dialog-backdrop';
+
+      const dialog = document.createElement('div');
+      dialog.className = 'ml-dialog';
+      dialog.setAttribute('role', 'alertdialog');
+      dialog.setAttribute('aria-modal', 'true');
+
+      const body = document.createElement('div');
+      body.className = 'ml-dialog__body';
+      const titleElement = document.createElement('span');
+      titleElement.className = 'ml-dialog__title';
+      titleElement.textContent = title;
+      const messageElement = document.createElement('span');
+      messageElement.className = 'ml-dialog__message';
+      messageElement.textContent = message;
+      body.append(titleElement, messageElement);
+      dialog.setAttribute('aria-label', title);
+
+      const actions = document.createElement('div');
+      actions.className = 'ml-dialog__actions';
+      const cancelButton = document.createElement('button');
+      cancelButton.type = 'button';
+      cancelButton.textContent = 'Cancelar';
+      const confirmButton = document.createElement('button');
+      confirmButton.type = 'button';
+      confirmButton.className = 'ml-destructive';
+      confirmButton.textContent = confirmLabel;
+      actions.append(cancelButton, confirmButton);
+
+      dialog.append(body, actions);
+      backdrop.appendChild(dialog);
+
+      const onKey = (e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          close(false);
+        }
+      };
+      const close = (result) => {
+        document.removeEventListener('keydown', onKey, true);
+        backdrop.classList.remove('ml-show');
+        setTimeout(() => backdrop.remove(), 180);
+        resolve(result);
+      };
+
+      cancelButton.addEventListener('click', () => close(false));
+      confirmButton.addEventListener('click', () => close(true));
+      backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(false); });
+      document.addEventListener('keydown', onKey, true);
+
+      document.body.appendChild(backdrop);
+      requestAnimationFrame(() => backdrop.classList.add('ml-show'));
+      confirmButton.focus();
+    });
   }
 
   setFilterMode(mode) {
@@ -1150,110 +1133,62 @@ class WallapopFilter {
               if (titleElement) {
                 console.log(`✅ Elemento de título encontrado:`, titleElement.tagName, titleElement.textContent);
                 
-                // Crear contenedor para el user_id y botón de eliminar
+                // Crear contenedor para el vendedor y el botón de bloquear
                 const userIdContainer = document.createElement('div');
                 userIdContainer.className = 'wallapop-user-id-container';
-                userIdContainer.style.cssText = `
-                  display: inline-flex;
-                  align-items: center;
-                  gap: 4px;
-                  margin-top: 4px;
-                `;
+                userIdContainer.dataset.userId = item.user_id;
 
-                // Crear elemento para mostrar el user_id
-                const userIdElement = document.createElement('div');
+                // Chip con el ID del vendedor (click para copiar)
+                const userIdElement = document.createElement('button');
+                userIdElement.type = 'button';
                 userIdElement.className = 'wallapop-user-id-display';
-                userIdElement.style.cssText = `
-                  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                  color: white;
-                  padding: 4px 8px;
-                  border-radius: 4px;
-                  font-size: 10px;
-                  font-family: 'Courier New', monospace;
-                  cursor: pointer;
-                  transition: all 0.2s ease;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                  position: relative;
-                  z-index: 1;
-                `;
-                userIdElement.textContent = `👤 ${item.user_id}`;
-                userIdElement.title = `Click para copiar User ID: ${item.user_id}`;
+                userIdElement.title = `Copiar ID del vendedor: ${item.user_id}`;
+                const renderUserId = (label) => {
+                  userIdElement.innerHTML = ML_ICONS.user;
+                  userIdElement.append(label);
+                };
+                renderUserId(item.user_id);
 
-                // Crear botón de eliminar (cruz)
+                // Botón para bloquear al vendedor
                 const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
                 deleteButton.className = 'wallapop-delete-user-btn';
-                deleteButton.style.cssText = `
-                  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
-                  color: white;
-                  border: none;
-                  border-radius: 50%;
-                  width: 20px;
-                  height: 20px;
-                  font-size: 12px;
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  transition: all 0.2s ease;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                  position: relative;
-                  z-index: 1;
-                `;
-                deleteButton.innerHTML = '×';
-                deleteButton.title = `Eliminar todos los anuncios de ${item.user_id}`;
-                
-                // Agregar funcionalidad de click para copiar
+                deleteButton.textContent = 'Bloquear';
+                deleteButton.title = `Ocultar todos los anuncios de ${item.user_id}`;
+
                 userIdElement.addEventListener('click', (e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   navigator.clipboard.writeText(item.user_id).then(() => {
-                    const originalText = userIdElement.textContent;
-                    userIdElement.textContent = '✅ Copiado!';
-                    userIdElement.style.background = 'linear-gradient(135deg, #00d4aa 0%, #00a085 100%)';
-
+                    renderUserId('Copiado');
+                    userIdElement.classList.add('ml-copied');
                     setTimeout(() => {
-                      userIdElement.textContent = originalText;
-                      userIdElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                      renderUserId(item.user_id);
+                      userIdElement.classList.remove('ml-copied');
                     }, 1000);
                   });
                 });
 
-                // Agregar funcionalidad de click para eliminar todos los anuncios del usuario
-                deleteButton.addEventListener('click', (e) => {
+                deleteButton.addEventListener('click', async (e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  
-                  // Mostrar confirmación
-                  const confirmed = confirm(`¿Estás seguro de que quieres eliminar TODOS los anuncios del usuario ${item.user_id}?\n\nEsto ocultará todos los productos de este vendedor de la página.`);
-                  
+
+                  const adCount = document.querySelectorAll(
+                    `.wallapop-user-id-container[data-user-id="${CSS.escape(String(item.user_id))}"]`
+                  ).length;
+                  const confirmed = await this.confirmDialog({
+                    title: `¿Bloquear a ${item.user_id}?`,
+                    message: adCount === 1
+                      ? 'Se ocultará su anuncio en esta página.'
+                      : `Se ocultarán sus ${adCount} anuncios en esta página.`,
+                    confirmLabel: 'Bloquear'
+                  });
+
                   if (confirmed) {
                     this.hideAllUserAds(item.user_id);
                   }
                 });
 
-                // Agregar hover effects para el user_id
-                userIdElement.addEventListener('mouseenter', () => {
-                  userIdElement.style.transform = 'scale(1.05)';
-                  userIdElement.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
-                });
-
-                userIdElement.addEventListener('mouseleave', () => {
-                  userIdElement.style.transform = 'scale(1)';
-                  userIdElement.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                });
-
-                // Agregar hover effects para el botón de eliminar
-                deleteButton.addEventListener('mouseenter', () => {
-                  deleteButton.style.transform = 'scale(1.1)';
-                  deleteButton.style.boxShadow = '0 4px 8px rgba(0,0,0,0.3)';
-                });
-
-                deleteButton.addEventListener('mouseleave', () => {
-                  deleteButton.style.transform = 'scale(1)';
-                  deleteButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                });
-
-                // Agregar elementos al contenedor
                 userIdContainer.appendChild(userIdElement);
                 userIdContainer.appendChild(deleteButton);
 
@@ -1337,8 +1272,7 @@ class WallapopFilter {
     let removedPrices = [];
     
     userAds.forEach(container => {
-      const userIdDisplay = container.querySelector('.wallapop-user-id-display');
-      if (userIdDisplay && userIdDisplay.textContent.includes(userId)) {
+      if (container.dataset.userId === String(userId)) {
         // Encontrar el contenedor principal del anuncio
         const itemContainer = container.closest('a[class*="ItemCard"]') ||
                             container.closest('a[href*="/item/"]') ||
@@ -1387,10 +1321,7 @@ class WallapopFilter {
         console.log(`📊 Nuevo precio promedio: ${this.priceAnalysis.averagePrice.toFixed(2)}€ (${this.priceAnalysis.allPrices.length} items restantes)`);
         
         // Actualizar el display del precio promedio
-        const averagePriceDisplay = document.querySelector('#wallapop-average-price-display');
-        if (averagePriceDisplay) {
-          averagePriceDisplay.innerHTML = `💰 Precio promedio: <strong>${this.priceAnalysis.averagePrice.toFixed(2)}€</strong> (${this.priceAnalysis.allPrices.length} items)`;
-        }
+        this.showAveragePriceDisplay();
         
         // Recalcular y actualizar todos los indicadores de precio
         this.updateAllPriceIndicators();
@@ -1401,6 +1332,7 @@ class WallapopFilter {
         if (averagePriceDisplay) {
           averagePriceDisplay.remove();
         }
+        this.updatePriceSummary();
       }
     }
     
@@ -1409,9 +1341,9 @@ class WallapopFilter {
     
     // Mostrar notificación
     if (removedCount > 0) {
-      this.showNotification(`✅ ${removedCount} anuncios del usuario ${userId} han sido eliminados`, 'success');
+      this.showNotification(removedCount === 1 ? `1 anuncio de ${userId} ocultado` : `${removedCount} anuncios de ${userId} ocultados`, 'success');
     } else {
-      this.showNotification(`⚠️ No se encontraron anuncios del usuario ${userId}`, 'warning');
+      this.showNotification(`No se encontraron anuncios de ${userId}`, 'warning');
     }
     
     console.log(`📊 Total de anuncios eliminados: ${removedCount}`);
@@ -1440,15 +1372,11 @@ class WallapopFilter {
 
   // Actualizar display de KPIs
   updateKpiDisplay() {
-    const matchedItems = document.getElementById('kpi-matched-items');
-    const uniqueAuthors = document.getElementById('kpi-unique-authors');
-    const blockedUsers = document.getElementById('kpi-blocked-users');
-    const blockedAds = document.getElementById('kpi-blocked-ads');
-    
-    if (matchedItems) matchedItems.textContent = this.kpiStats.matchedItems;
-    if (uniqueAuthors) uniqueAuthors.textContent = this.userBlocking.uniqueAuthors.size;
-    if (blockedUsers) blockedUsers.textContent = this.userBlocking.blockedUsers.size;
-    if (blockedAds) blockedAds.textContent = this.userBlocking.blockedAdsCount;
+    const blocked = document.getElementById('ml-blocked');
+    if (blocked) {
+      const ads = this.userBlocking.blockedAdsCount;
+      blocked.textContent = `${this.userBlocking.blockedUsers.size} · ${ads} ${ads === 1 ? 'anuncio' : 'anuncios'}`;
+    }
   }
 
   // Reiniciar contadores
@@ -1475,309 +1403,110 @@ class WallapopFilter {
 
 
   addFilterIndicator() {
-    // Remover indicador existente si existe (incluidos restos de instancias anteriores)
-    if (this.filterIndicator) {
-      this.filterIndicator.remove();
-    }
-    document.querySelectorAll('#wallapop-filter-sidebar, #wallapop-filter-tab').forEach(el => el.remove());
+    // Remover panel existente (incluidos restos de instancias anteriores)
+    if (this.filterIndicator) this.filterIndicator.remove();
+    if (this.sidebarTab) this.sidebarTab.remove();
+    document.querySelectorAll('#ml-sidebar, #ml-tab').forEach(el => el.remove());
 
-    this.filterIndicator = document.createElement('div');
-    this.filterIndicator.id = 'wallapop-filter-sidebar';
-    this.filterIndicator.style.cssText = `
-      position: fixed !important;
-      top: 0 !important;
-      right: -280px !important;
-      width: 280px !important;
-      height: 100vh !important;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-      color: white !important;
-      z-index: 999999 !important;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-      box-shadow: -4px 0 20px rgba(0,0,0,0.3) !important;
-      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-      overflow-y: auto !important;
-      overflow-x: hidden !important;
-    `;
-    
+    let version = '1.0.0';
+    try { version = chrome.runtime.getManifest().version; } catch (e) {}
+
+    this.filterIndicator = document.createElement('aside');
+    this.filterIndicator.id = 'ml-sidebar';
+    this.filterIndicator.className = 'ml-root';
+    this.filterIndicator.setAttribute('aria-label', 'MarketLens');
     this.filterIndicator.innerHTML = `
-      <div style="padding: 24px; height: 100%; display: flex; flex-direction: column;">
-        <!-- Header -->
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <img id="sidebar-logo" src="${this.getIconURL('icons/logo.png')}" style="
-              width: 56px;
-              height: 56px;
-              transition: all 0.3s ease;
-              filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4));
-            " alt="Reserve Sniper Logo">
-            <h2 style="margin: 0; font-size: 18px; font-weight: 600;">Reserve Sniper</h2>
-          </div>
-          <button id="toggle-sidebar" style="
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            cursor: pointer;
-            font-size: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-          " onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">◀</button>
+      <div class="ml-header">
+        <span class="ml-logo">${ML_ICONS.logo(22)}</span>
+        <div class="ml-header__text">
+          <span class="ml-title">MarketLens</span>
+          <span class="ml-subtitle" id="sidebar-status">Cargando…</span>
         </div>
-        
-        <!-- Toggle Principal -->
-        <div style="background: rgba(255,255,255,0.15); border-radius: 16px; padding: 20px; margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.2);">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <span style="font-weight: 600; font-size: 16px;">Extensión Activa</span>
-            <label style="position: relative; display: inline-block; width: 60px; height: 30px;">
-              <input type="checkbox" id="extension-toggle" checked style="opacity: 0; width: 0; height: 0;">
-              <span id="toggle-slider" style="
-                position: absolute;
-                cursor: pointer;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: #4CAF50;
-                transition: .3s;
-                border-radius: 30px;
-                box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
-              "></span>
-              <span id="toggle-knob" style="
-                position: absolute;
-                content: '';
-                height: 24px;
-                width: 24px;
-                left: 33px;
-                bottom: 3px;
-                background-color: white;
-                transition: .3s;
-                border-radius: 50%;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-              "></span>
-            </label>
-          </div>
-          <div style="font-size: 13px; opacity: 0.9; line-height: 1.4;">
-            Activa o desactiva el filtrado automático de productos
-          </div>
-        </div>
-        
-        <!-- Estado -->
-        <div style="background: rgba(255,255,255,0.15); border-radius: 16px; padding: 20px; margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.2);">
-          <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">📊 Estado</h3>
-          <div style="font-size: 14px; line-height: 1.6;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-              <span style="opacity: 0.9;">Productos encontrados:</span>
-              <span id="sidebar-results-count" style="font-weight: 600;">-</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-              <span style="opacity: 0.9;">Filtro actual:</span>
-              <span id="sidebar-current-mode" style="font-weight: 600;">Todos</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; padding: 8px 0;">
-              <span style="opacity: 0.9;">Estado:</span>
-              <span id="sidebar-status" style="font-weight: 600;">Cargando...</span>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Filtros -->
-        <div style="background: rgba(255,255,255,0.15); border-radius: 16px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.2);">
-          <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">🎯 Filtrar</h3>
-          <div style="display: flex; flex-direction: column; gap: 12px;">
-            <button class="sidebar-filter-btn" data-mode="all" style="
-              background: rgba(255,255,255,0.2);
-              border: 2px solid rgba(255,255,255,0.3);
-              color: white;
-              padding: 14px 16px;
-              border-radius: 12px;
-              cursor: pointer;
-              font-size: 14px;
-              font-weight: 500;
-              transition: all 0.2s ease;
-              text-align: left;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-            " onmouseover="this.style.background='rgba(255,255,255,0.3)'; this.style.transform='translateX(-2px)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'; this.style.transform='translateX(0)'">
-              <span>📋</span>
-              <span>Mostrar Todos</span>
-            </button>
-            
-            <button class="sidebar-filter-btn" data-mode="available" style="
-              background: rgba(255,255,255,0.2);
-              border: 2px solid rgba(255,255,255,0.3);
-              color: white;
-              padding: 14px 16px;
-              border-radius: 12px;
-              cursor: pointer;
-              font-size: 14px;
-              font-weight: 500;
-              transition: all 0.2s ease;
-              text-align: left;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-            " onmouseover="this.style.background='rgba(255,255,255,0.3)'; this.style.transform='translateX(-2px)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'; this.style.transform='translateX(0)'">
-              <span>✅</span>
-              <span>Solo Disponibles</span>
-            </button>
-            
-            <button class="sidebar-filter-btn" data-mode="reserved" style="
-              background: rgba(255,255,255,0.2);
-              border: 2px solid rgba(255,255,255,0.3);
-              color: white;
-              padding: 14px 16px;
-              border-radius: 12px;
-              cursor: pointer;
-              font-size: 14px;
-              font-weight: 500;
-              transition: all 0.2s ease;
-              text-align: left;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-            " onmouseover="this.style.background='rgba(255,255,255,0.3)'; this.style.transform='translateX(-2px)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'; this.style.transform='translateX(0)'">
-              <span>🔒</span>
-              <span>Solo Reservados</span>
-            </button>
-          </div>
-        </div>
-        
-         <!-- Guía de uso -->
-         <div style="background: rgba(255,255,255,0.1); border-radius: 16px; padding: 16px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.15);">
-           <div style="text-align: center;">
-             <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">📖 ¿Necesitas ayuda?</div>
-             <a href="#" id="github-guide-link" style="
-               display: inline-flex;
-               align-items: center;
-               gap: 10px;
-               background: rgba(255,255,255,0.2);
-               color: white;
-               padding: 12px 18px;
-               border-radius: 25px;
-               text-decoration: none;
-               font-size: 13px;
-               font-weight: 600;
-               transition: all 0.2s ease;
-               border: 1px solid rgba(255,255,255,0.3);
-             " onmouseover="this.style.background='rgba(255,255,255,0.3)'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-               <svg width="20" height="20" viewBox="0 0 98 96" xmlns="http://www.w3.org/2000/svg">
-                 <path fill-rule="evenodd" clip-rule="evenodd" d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z" fill="currentColor"/>
-               </svg>
-               <span>Guía de Uso</span>
-             </a>
-             <div style="font-size: 11px; opacity: 0.8; margin-top: 6px;">Instrucciones completas en GitHub</div>
-           </div>
-         </div>
-        
-        <!-- Buy me a coffee -->
-        <div style="background: rgba(255,255,255,0.1); border-radius: 16px; padding: 16px; border: 1px solid rgba(255,255,255,0.15);">
-          <div style="text-align: center;">
-            <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">☕ ¿Te gusta Reserve Sniper?</div>
-            <a href="https://buymeacoffee.com/martingodeg" target="_blank" style="
-              display: inline-flex;
-              align-items: center;
-              gap: 10px;
-              background: #FFDD00;
-              color: #0D0C22;
-              padding: 12px 18px;
-              border-radius: 25px;
-              text-decoration: none;
-              font-size: 13px;
-              font-weight: 600;
-              transition: all 0.2s ease;
-              box-shadow: 0 3px 10px rgba(255,221,0,0.3);
-            " onmouseover="this.style.background='#FFE55C'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 5px 15px rgba(255,221,0,0.4)'" onmouseout="this.style.background='#FFDD00'; this.style.transform='translateY(0)'; this.style.boxShadow='0 3px 10px rgba(255,221,0,0.3)'">
-              <svg width="20" height="28" viewBox="0 0 27 39" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M14.3206 17.9122C12.9282 18.5083 11.3481 19.1842 9.30013 19.1842C8.44341 19.1824 7.59085 19.0649 6.76562 18.8347L8.18203 33.3768C8.23216 33.9847 8.50906 34.5514 8.95772 34.9645C9.40638 35.3776 9.994 35.6069 10.6039 35.6068C10.6039 35.6068 12.6122 35.7111 13.2823 35.7111C14.0036 35.7111 16.1662 35.6068 16.1662 35.6068C16.776 35.6068 17.3635 35.3774 17.8121 34.9643C18.2606 34.5512 18.5374 33.9846 18.5876 33.3768L20.1046 17.3073C19.4267 17.0757 18.7425 16.9219 17.9712 16.9219C16.6372 16.9214 15.5623 17.3808 14.3206 17.9122Z" fill="#FFDD00"/>
-                <path d="M26.6584 10.3609L26.4451 9.28509C26.2537 8.31979 25.8193 7.40768 24.8285 7.05879C24.5109 6.94719 24.1505 6.89922 23.907 6.66819C23.6634 6.43716 23.5915 6.07837 23.5351 5.74565C23.4308 5.13497 23.3328 4.52377 23.2259 3.91413C23.1336 3.39002 23.0606 2.80125 22.8202 2.32042C22.5073 1.6748 21.858 1.29723 21.2124 1.04743C20.8815 0.923938 20.5439 0.819467 20.2012 0.734533C18.5882 0.308987 16.8922 0.152536 15.2328 0.0633591C13.241 -0.046547 11.244 -0.0134338 9.25692 0.162444C7.77794 0.296992 6.22021 0.459701 4.81476 0.971295C4.30108 1.15851 3.77175 1.38328 3.38115 1.78015C2.90189 2.26775 2.74544 3.02184 3.09537 3.62991C3.34412 4.06172 3.7655 4.3668 4.21242 4.56862C4.79457 4.82867 5.40253 5.02654 6.02621 5.15896C7.76282 5.54279 9.56148 5.6935 11.3356 5.75765C13.302 5.83701 15.2716 5.77269 17.2286 5.56521C17.7126 5.51202 18.1956 5.44822 18.6779 5.37382C19.2458 5.28673 19.6103 4.54411 19.4429 4.02678C19.2427 3.40828 18.7045 3.16839 18.0959 3.26173C18.0062 3.27581 17.917 3.28885 17.8273 3.30189L17.7626 3.31128C17.5565 3.33735 17.3503 3.36169 17.1441 3.38429C16.7182 3.43018 16.2913 3.46773 15.8633 3.49693C14.9048 3.56368 13.9437 3.59445 12.9831 3.59602C12.0391 3.59602 11.0947 3.56942 10.1529 3.50736C9.72314 3.4792 9.29447 3.44339 8.86684 3.39993C8.67232 3.37959 8.47832 3.35821 8.28432 3.33422L8.0997 3.31076L8.05955 3.30502L7.86816 3.27738C7.47703 3.21845 7.0859 3.15066 6.69895 3.06878C6.6599 3.06012 6.62498 3.03839 6.59994 3.0072C6.57491 2.976 6.56127 2.9372 6.56127 2.8972C6.56127 2.85721 6.57491 2.81841 6.59994 2.78721C6.62498 2.75602 6.6599 2.73429 6.69895 2.72563H6.70625C7.04158 2.65418 7.37951 2.59317 7.71849 2.53997C7.83148 2.52224 7.94482 2.50486 8.05851 2.48782H8.06164C8.27389 2.47374 8.48718 2.43567 8.69839 2.41064C10.536 2.2195 12.3845 2.15434 14.231 2.2156C15.1275 2.24168 16.0234 2.29435 16.9157 2.38509C17.1076 2.40491 17.2985 2.42577 17.4894 2.44923C17.5624 2.4581 17.6359 2.46853 17.7094 2.47739L17.8575 2.49878C18.2893 2.56309 18.7189 2.64115 19.1462 2.73293C19.7793 2.87061 20.5923 2.91546 20.8739 3.60906C20.9636 3.82913 21.0043 4.07371 21.0538 4.30474L21.1169 4.59939C21.1186 4.60467 21.1198 4.61008 21.1206 4.61555C21.2697 5.31089 21.4191 6.00623 21.5686 6.70157C21.5795 6.75293 21.5798 6.80601 21.5693 6.85748C21.5589 6.90895 21.5379 6.95771 21.5078 7.00072C21.4776 7.04373 21.4389 7.08007 21.3941 7.10747C21.3493 7.13487 21.2993 7.15274 21.2473 7.15997H21.2431L21.1519 7.17248L21.0617 7.18448C20.7759 7.22168 20.4897 7.25644 20.2033 7.28878C19.639 7.3531 19.0739 7.40872 18.5079 7.45566C17.3831 7.54918 16.2562 7.61055 15.127 7.63975C14.5516 7.65505 13.9763 7.66217 13.4013 7.66113C11.1124 7.65933 8.82553 7.5263 6.55188 7.2627C6.30574 7.2335 6.05959 7.20221 5.81344 7.1704C6.00431 7.19491 5.67472 7.15162 5.60797 7.14224C5.45152 7.12033 5.29506 7.09756 5.13861 7.07392C4.61346 6.99517 4.09144 6.89817 3.56733 6.81317C2.9337 6.70887 2.32771 6.76102 1.75458 7.07392C1.28413 7.33136 0.903361 7.72614 0.663078 8.20558C0.415886 8.71665 0.342354 9.2731 0.231796 9.82224C0.121237 10.3714 -0.0508594 10.9622 0.0143284 11.526C0.154613 12.7427 1.00518 13.7314 2.22863 13.9525C3.37959 14.1611 4.5368 14.3301 5.69714 14.474C10.2552 15.0323 14.8601 15.0991 19.4325 14.6733C19.8048 14.6385 20.1767 14.6006 20.548 14.5596C20.6639 14.5468 20.7813 14.5602 20.8914 14.5987C21.0016 14.6372 21.1017 14.6998 21.1845 14.782C21.2673 14.8642 21.3307 14.9639 21.37 15.0737C21.4093 15.1836 21.4235 15.3009 21.4116 15.4169L21.2958 16.5423C21.0625 18.8164 20.8292 21.0903 20.596 23.3641C20.3526 25.7519 20.1077 28.1395 19.8612 30.5269C19.7916 31.1993 19.7221 31.8715 19.6526 32.5436C19.5858 33.2054 19.5764 33.888 19.4507 34.542C19.2526 35.5704 18.5564 36.2019 17.5405 36.433C16.6098 36.6448 15.659 36.756 14.7045 36.7646C13.6464 36.7704 12.5888 36.7234 11.5307 36.7292C10.4011 36.7354 9.01755 36.6311 8.1456 35.7905C7.37951 35.052 7.27365 33.8958 7.16935 32.8961C7.03028 31.5725 6.89243 30.2491 6.75579 28.9259L5.98918 21.568L5.49324 16.8072C5.48489 16.7285 5.47655 16.6508 5.46873 16.5715C5.40927 16.0036 5.0072 15.4477 4.37357 15.4764C3.83121 15.5004 3.21479 15.9614 3.27841 16.5715L3.64607 20.1011L4.40642 27.4021C4.62302 29.4759 4.8391 31.5501 5.05465 33.6247C5.09637 34.022 5.13548 34.4205 5.17929 34.8179C5.41762 36.9894 7.07599 38.1596 9.12967 38.4892C10.3291 38.6822 11.5578 38.7218 12.775 38.7416C14.3353 38.7667 15.9113 38.8267 17.4461 38.544C19.7203 38.1268 21.4267 36.6082 21.6702 34.2526C21.7398 33.5725 21.8093 32.8923 21.8788 32.2119C22.11 29.9618 22.3409 27.7115 22.5714 25.4611L23.3255 18.1079L23.6713 14.7379C23.6885 14.5708 23.759 14.4137 23.8725 14.2898C23.986 14.1659 24.1363 14.0819 24.3012 14.0501C24.9515 13.9233 25.5732 13.7069 26.0357 13.212C26.7721 12.424 26.9187 11.3967 26.6584 10.3609ZM2.19525 11.0879C2.20516 11.0832 2.18691 11.1682 2.17909 11.2079C2.17752 11.1479 2.18065 11.0947 2.19525 11.0879ZM2.25836 11.5761C2.26357 11.5724 2.27921 11.5933 2.29538 11.6183C2.27087 11.5953 2.25523 11.5781 2.25783 11.5761H2.25836ZM2.32041 11.6579C2.34284 11.696 2.35483 11.72 2.32041 11.6579V11.6579ZM2.44505 11.7591H2.44818C2.44818 11.7627 2.45392 11.7664 2.456 11.7701C2.45255 11.766 2.4487 11.7624 2.44453 11.7591H2.44505ZM24.271 11.6079C24.0373 11.83 23.6853 11.9333 23.3375 11.9849C19.4366 12.5638 15.479 12.8569 11.5354 12.7275C8.71299 12.6311 5.92035 12.3176 3.12613 11.9229C2.85234 11.8843 2.55561 11.8342 2.36735 11.6324C2.01273 11.2517 2.18691 10.4851 2.27921 10.0251C2.3637 9.60373 2.52536 9.04207 3.02653 8.9821C3.80878 8.89031 4.71724 9.22042 5.49115 9.33776C6.4229 9.47996 7.35813 9.59382 8.29683 9.67935C12.303 10.0444 16.3765 9.98755 20.3649 9.45354C21.0919 9.35584 21.8163 9.24233 22.538 9.11299C23.181 8.99774 23.8939 8.78132 24.2825 9.44728C24.5489 9.90098 24.5844 10.508 24.5432 11.0207C24.5305 11.244 24.4329 11.4541 24.2705 11.6079H24.271Z" fill="#0D0C22"/>
-              </svg>
-              <span>Invítame a un café</span>
-            </a>
-            <div style="font-size: 11px; opacity: 0.8; margin-top: 6px;">¡Ayuda a mantener la extensión!</div>
-          </div>
-        </div>
-        
-        
-        
+        <button type="button" class="ml-icon-btn" id="toggle-sidebar" aria-label="Cerrar panel">
+          <span class="ml-icon-btn__circle">${ML_ICONS.close}</span>
+        </button>
       </div>
-      
+
+      <div class="ml-card ml-toggle-row">
+        <div class="ml-toggle-row__text">
+          <span class="ml-toggle-row__title">Filtrado automático</span>
+          <span class="ml-subtitle">Aplica el filtro al cargar anuncios</span>
+        </div>
+        <label class="ml-switch">
+          <input type="checkbox" id="extension-toggle" checked aria-label="Filtrado automático">
+          <span class="ml-switch__track"></span>
+        </label>
+      </div>
+
+      <div>
+        <span class="ml-section-label">Mostrar</span>
+        <div class="ml-segmented" role="group" aria-label="Filtro de anuncios">
+          <button type="button" class="sidebar-filter-btn" data-mode="all" aria-pressed="false">Todos</button>
+          <button type="button" class="sidebar-filter-btn" data-mode="available" aria-pressed="false">Disponibles</button>
+          <button type="button" class="sidebar-filter-btn" data-mode="reserved" aria-pressed="false">Reservados</button>
+        </div>
+      </div>
+
+      <div class="ml-metrics">
+        <div class="ml-card ml-metric">
+          <span class="ml-metric__label">Encontrados</span>
+          <span class="ml-metric__value" id="sidebar-results-count">–</span>
+        </div>
+        <div class="ml-card ml-metric">
+          <span class="ml-metric__label">Visibles</span>
+          <span class="ml-metric__value" id="ml-visible-count">–</span>
+        </div>
+        <div class="ml-card ml-metric">
+          <span class="ml-metric__label">Reservados</span>
+          <span class="ml-metric__value" id="ml-reserved-count">–</span>
+        </div>
+      </div>
+
+      <div class="ml-card ml-list">
+        <div class="ml-list__row">
+          <span>Precio medio</span>
+          <span class="ml-list__value ml-list__value--strong" id="ml-avg-price">–</span>
+        </div>
+        <div class="ml-list__row">
+          <span>Rango</span>
+          <span class="ml-list__value" id="ml-price-range">–</span>
+        </div>
+        <div class="ml-list__row">
+          <span>Vendedores bloqueados</span>
+          <span class="ml-list__value" id="ml-blocked">0 · 0 anuncios</span>
+        </div>
+      </div>
+
+      <div class="ml-spacer"></div>
+
+      <div class="ml-footer">
+        <a class="ml-link" id="github-guide-link" href="https://github.com/dierodfer/MarketLens#readme" target="_blank" rel="noopener">
+          ${ML_ICONS.book}<span>Guía de uso</span>
+        </a>
+        <a class="ml-link" href="https://buymeacoffee.com/martingodeg" target="_blank" rel="noopener">
+          ${ML_ICONS.coffee}<span>Invítame a un café</span>
+        </a>
+        <span class="ml-version">Versión ${version}</span>
       </div>
     `;
-    
     document.body.appendChild(this.filterIndicator);
-    
-    // Crear tab separado para abrir el sidebar
-    this.sidebarTab = document.createElement('div');
-    this.sidebarTab.id = 'wallapop-filter-tab';
-    this.sidebarTab.style.cssText = `
-      position: fixed !important;
-      right: 0px !important;
-      top: 50% !important;
-      transform: translateY(-50%) !important;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-      color: white !important;
-      padding: 16px 10px !important;
-      border-radius: 16px 0 0 16px !important;
-      cursor: pointer !important;
-      font-size: 12px !important;
-      font-weight: 700 !important;
-      box-shadow: -4px 0 15px rgba(0,0,0,0.3) !important;
-      transition: all 0.3s ease !important;
-      z-index: 999998 !important;
-      min-width: 60px !important;
-      width: 60px !important;
-      text-align: center !important;
-      line-height: 1.3 !important;
-      user-select: none !important;
-      display: flex !important;
-      flex-direction: column !important;
-      align-items: center !important;
-      justify-content: center !important;
-    `;
-    
+
+    // Pestaña para abrir el panel
+    this.sidebarTab = document.createElement('button');
+    this.sidebarTab.type = 'button';
+    this.sidebarTab.id = 'ml-tab';
+    this.sidebarTab.className = 'ml-root';
+    this.sidebarTab.setAttribute('aria-label', 'Abrir MarketLens');
     this.sidebarTab.innerHTML = `
-      <img src="${this.getIconURL('icons/logo.png')}" style="
-        width: 42px;
-        height: 42px;
-        margin-bottom: 6px;
-        filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5));
-        transition: all 0.3s ease;
-      " alt="Reserve Sniper">
-      <div style="font-size: 9px; font-weight: 800; letter-spacing: 0.3px; line-height: 1.1; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">
-        RESERVE<br>SNIPER
-      </div>
+      <span class="ml-logo">${ML_ICONS.logo(18)}</span>
+      <span class="ml-status-dot" id="ml-tab-dot"></span>
     `;
-    
-    // Efectos hover para el tab con cambio de icono
-    this.sidebarTab.addEventListener('mouseenter', () => {
-      this.sidebarTab.style.right = '5px';
-      this.sidebarTab.style.boxShadow = '-6px 0 20px rgba(0,0,0,0.4)';
-      this.sidebarTab.style.transform = 'translateY(-50%) scale(1.05)';
-      
-      // Cambiar a mafiaIcon en hover
-      const tabImg = this.sidebarTab.querySelector('img');
-      if (tabImg) {
-        tabImg.src = this.getIconURL('icons/mafiaIcon.png');
-      }
-    });
-    
-    this.sidebarTab.addEventListener('mouseleave', () => {
-      this.sidebarTab.style.right = '0px';
-      this.sidebarTab.style.boxShadow = '-4px 0 15px rgba(0,0,0,0.3)';
-      this.sidebarTab.style.transform = 'translateY(-50%) scale(1)';
-      
-      // Volver al icono según el filtro actual
-      this.updateTabIcon();
-    });
-    
     document.body.appendChild(this.sidebarTab);
+
     this.setupSidebarEvents();
-    
+    this.updatePriceSummary();
+    this.updateKpiDisplay();
+
     // Actualizar estado cada 2 segundos
     this.sidebarInterval = setInterval(() => {
       if (this.isInitialized) {
@@ -1800,239 +1529,112 @@ class WallapopFilter {
   updateFilterIndicator(visibleCount = null, totalCount = null) {
     if (!this.filterIndicator) return;
 
-    // Actualizar estado en el sidebar
-    const resultsElement = this.filterIndicator.querySelector('#sidebar-results-count');
-    const modeElement = this.filterIndicator.querySelector('#sidebar-current-mode');
-    const statusElement = this.filterIndicator.querySelector('#sidebar-status');
+    const currentResults = this.getSearchResults();
+    let reservedCount = 0;
+    let visibleNow = 0;
 
-    // Calcular valores actuales si no se proporcionan
-    if (visibleCount === null || totalCount === null) {
-      const currentResults = this.getSearchResults();
-      totalCount = currentResults.length;
-      visibleCount = 0;
-      
-      currentResults.forEach(product => {
-        const card = product.closest('article, li, [data-testid="item-card"], .ItemCard, .item-card, [class*="ItemCard"], [class*="Card"]') || product;
-        if (!card.classList.contains('rs-hidden')) {
-          visibleCount++;
-        }
-      });
-    }
-
-    if (resultsElement) {
-      resultsElement.textContent = `${totalCount}`;
-    }
-
-    if (modeElement) {
-      modeElement.textContent = this.getModeText(this.filterMode);
-    }
-
-    if (statusElement) {
-      if (!this.extensionEnabled) {
-        statusElement.textContent = '❌ Desconectado';
-      } else if (this.isInitialized) {
-        statusElement.textContent = `${visibleCount}/${totalCount} visibles`;
-      } else {
-        statusElement.textContent = '⏳ Cargando...';
-      }
-    }
-
-    // Actualizar botones activos
-    const buttons = this.filterIndicator.querySelectorAll('.sidebar-filter-btn');
-    buttons.forEach(button => {
-      const isActive = button.dataset.mode === this.filterMode;
-      if (isActive) {
-        button.style.background = 'rgba(255,255,255,0.4)';
-        button.style.borderColor = 'rgba(255,255,255,0.6)';
-        button.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-      } else {
-        button.style.background = 'rgba(255,255,255,0.2)';
-        button.style.borderColor = 'rgba(255,255,255,0.3)';
-        button.style.boxShadow = 'none';
-      }
+    currentResults.forEach(product => {
+      if (this.isItemReserved(product)) reservedCount++;
+      const card = product.closest('article, li, [data-testid="item-card"], .ItemCard, .item-card, [class*="ItemCard"], [class*="Card"]') || product;
+      if (!card.classList.contains('rs-hidden')) visibleNow++;
     });
 
-    // Actualizar iconos según el filtro
-    this.updateTabIcon();
-    this.updateSidebarIcon();
-  }
+    if (totalCount === null) totalCount = currentResults.length;
+    if (visibleCount === null) visibleCount = visibleNow;
 
-  updateTabIcon() {
-    if (!this.sidebarTab) return;
-    
-    const tabImg = this.sidebarTab.querySelector('img');
-    if (!tabImg) return;
-
-    let iconSrc = 'icons/logo.png'; // Por defecto
+    const setText = (id, value) => {
+      const element = this.filterIndicator.querySelector(id);
+      if (element) element.textContent = `${value}`;
+    };
+    setText('#sidebar-results-count', totalCount);
+    setText('#ml-visible-count', visibleCount);
+    setText('#ml-reserved-count', reservedCount);
 
     if (!this.extensionEnabled) {
-      iconSrc = 'icons/logo.png';
+      setText('#sidebar-status', 'Wallapop · En pausa');
+    } else if (this.isInitialized) {
+      setText('#sidebar-status', `Wallapop · ${visibleCount} de ${totalCount} visibles`);
     } else {
-      switch (this.filterMode) {
-        case 'reserved':
-          iconSrc = 'icons/iconHaunt.png';
-          break;
-        case 'available':
-          iconSrc = 'icons/mafiaIcon.png';
-          break;
-        default:
-          iconSrc = 'icons/logo.png';
-      }
+      setText('#sidebar-status', 'Cargando…');
     }
 
-    // Cambio directo de icono sin animaciones complejas
-    try {
-      tabImg.src = this.getIconURL(iconSrc);
-      tabImg.style.transform = 'scale(1)';
-      tabImg.style.opacity = '1';
-    } catch (error) {
-      console.warn('⚠️ Error actualizando icono del tab:', error);
-      // Fallback a logo.png
-      tabImg.src = this.getIconURL('icons/logo.png');
-    }
+    // Marcar el segmento activo
+    this.filterIndicator.querySelectorAll('.sidebar-filter-btn').forEach(button => {
+      const isActive = button.dataset.mode === this.filterMode;
+      button.classList.toggle('ml-active', isActive);
+      button.setAttribute('aria-pressed', String(isActive));
+    });
+
+    this.updateStatusIndicators();
   }
 
-  updateSidebarIcon() {
-    if (!this.filterIndicator) return;
-    
-    const sidebarImg = this.filterIndicator.querySelector('#sidebar-logo');
-    if (!sidebarImg) return;
-
-    let iconSrc = 'icons/logo.png'; // Por defecto
-
-    if (!this.extensionEnabled) {
-      iconSrc = 'icons/logo.png';
-    } else {
-      switch (this.filterMode) {
-        case 'reserved':
-          iconSrc = 'icons/iconHaunt.png';
-          break;
-        case 'available':
-          iconSrc = 'icons/mafiaIcon.png';
-          break;
-        default:
-          iconSrc = 'icons/logo.png';
-      }
-    }
-
-    // Cambio directo de icono sin animaciones complejas
-    try {
-      sidebarImg.src = this.getIconURL(iconSrc);
-      sidebarImg.style.transform = 'scale(1)';
-      sidebarImg.style.opacity = '1';
-    } catch (error) {
-      console.warn('⚠️ Error actualizando icono del sidebar:', error);
-      // Fallback a logo.png
-      sidebarImg.src = this.getIconURL('icons/logo.png');
-    }
+  // Punto de estado de la pestaña: verde activo, gris en pausa
+  updateStatusIndicators() {
+    const dot = this.sidebarTab && this.sidebarTab.querySelector('#ml-tab-dot');
+    if (dot) dot.classList.toggle('ml-on', this.extensionEnabled !== false);
   }
 
   setupSidebarEvents() {
     if (!this.filterIndicator) return;
 
-    // Toggle sidebar
     const toggleBtn = this.filterIndicator.querySelector('#toggle-sidebar');
-    let isOpen = false;
 
-    const toggleSidebar = () => {
-      isOpen = !isOpen;
-      if (isOpen) {
-        // Abrir sidebar
-        this.filterIndicator.style.right = '0px';
-        if (toggleBtn) toggleBtn.textContent = '▶';
-        if (this.sidebarTab) this.sidebarTab.style.display = 'none';
-        console.log('📂 Sidebar abierto');
-      } else {
-        // Cerrar sidebar
-        this.filterIndicator.style.right = '-280px';
-        if (toggleBtn) toggleBtn.textContent = '◀';
-        if (this.sidebarTab) this.sidebarTab.style.display = 'block';
-        console.log('📁 Sidebar cerrado');
-      }
+    const setOpen = (open, moveFocus = false) => {
+      this.filterIndicator.classList.toggle('ml-open', open);
+      this.filterIndicator.inert = !open;
+      if (this.sidebarTab) this.sidebarTab.classList.toggle('ml-hidden', open);
+      if (moveFocus) (open ? toggleBtn : this.sidebarTab)?.focus();
+      console.log(open ? '📂 Panel abierto' : '📁 Panel cerrado');
     };
+    setOpen(false);
 
-    // Eventos para abrir/cerrar
-    if (toggleBtn) {
-      toggleBtn.addEventListener('click', toggleSidebar);
-    }
+    if (toggleBtn) toggleBtn.addEventListener('click', () => setOpen(false, true));
+    if (this.sidebarTab) this.sidebarTab.addEventListener('click', () => setOpen(true, true));
 
-    if (this.sidebarTab) {
-      this.sidebarTab.addEventListener('click', toggleSidebar);
-    }
-
-    // Toggle de extensión
+    // Interruptor de filtrado automático
     const extensionToggle = this.filterIndicator.querySelector('#extension-toggle');
-    const toggleSlider = this.filterIndicator.querySelector('#toggle-slider');
-    const toggleKnob = this.filterIndicator.querySelector('#toggle-knob');
-
     if (extensionToggle) {
       extensionToggle.addEventListener('change', (e) => {
         const isEnabled = e.target.checked;
-        
         this.extensionEnabled = isEnabled;
-        
+
         if (isEnabled) {
-          // Activar extensión
           this.applyFilter();
-          toggleSlider.style.background = '#4CAF50';
-          toggleKnob.style.left = '33px';
-          console.log('✅ Extensión activada');
+          console.log('✅ Filtrado activado');
         } else {
-          // Desactivar extensión - mostrar todos los productos
-          const products = this.getSearchResults();
-          products.forEach(product => {
+          // Mostrar todos los productos
+          this.getSearchResults().forEach(product => {
             const card = product.closest('article, li, [data-testid="item-card"], .ItemCard, .item-card, [class*="ItemCard"], [class*="Card"]') || product;
             card.classList.remove('rs-hidden');
           });
-          toggleSlider.style.background = '#ccc';
-          toggleKnob.style.left = '3px';
-          
-          console.log('❌ Extensión desactivada - mostrando todos los productos');
+          console.log('⏸️ Filtrado en pausa - mostrando todos los productos');
         }
-        
+
         // Guardar estado
-        chrome.storage.local.set({ extensionEnabled: isEnabled });
-        
-        // Actualizar indicador después del cambio
-        setTimeout(() => {
-          this.updateFilterIndicator();
-        }, 100);
+        try { chrome.storage.local.set({ extensionEnabled: isEnabled }); } catch (err) {}
+
+        this.updateStatusIndicators();
+        setTimeout(() => this.updateFilterIndicator(), 100);
       });
     }
 
-    // Botones de filtro
-    const filterButtons = this.filterIndicator.querySelectorAll('.sidebar-filter-btn');
-    filterButtons.forEach(button => {
+    // Control segmentado de filtro
+    this.filterIndicator.querySelectorAll('.sidebar-filter-btn').forEach(button => {
       button.addEventListener('click', () => {
         const mode = button.dataset.mode;
-        
-        // Verificar si la extensión está activa
-        const isEnabled = extensionToggle ? extensionToggle.checked : true;
-        if (!isEnabled) {
-          console.log('⚠️ Extensión desactivada, activando automáticamente...');
-          if (extensionToggle) {
-            extensionToggle.checked = true;
-            extensionToggle.dispatchEvent(new Event('change'));
-          }
+
+        // Elegir un filtro reactiva el filtrado si estaba en pausa
+        if (extensionToggle && !extensionToggle.checked) {
+          extensionToggle.checked = true;
+          extensionToggle.dispatchEvent(new Event('change'));
         }
-        
+
         this.setFilterMode(mode);
         console.log(`🎯 Filtro cambiado a: ${mode}`);
       });
     });
 
-    // Enlace de GitHub
-    const githubLink = this.filterIndicator.querySelector('#github-guide-link');
-    if (githubLink) {
-      githubLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        // Aquí puedes poner tu URL de GitHub cuando la tengas
-        console.log('📚 Redirigiendo a GitHub para guía de uso...');
-        window.open('https://github.com/MartinGoDev/Reserve-Sniper-Extension?tab=readme-ov-file', '_blank');
-      });
-    }
-
-    console.log('🎛️ Eventos del sidebar configurados');
+    console.log('🎛️ Eventos del panel configurados');
   }
 
   setupMessageListener() {
@@ -2221,7 +1823,7 @@ setTimeout(() => {
 
 }, 1000);
 
-console.log('✅ Reserve Sniper Extension cargado');
+console.log('✅ MarketLens cargado');
 console.log('🎯 Usa el menú lateral para filtrar productos');
 console.log('🧪 Test manual: testReservedFilter()');
 console.log('🧪 Mostrar todos: showAllProducts()');
