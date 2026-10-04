@@ -82,7 +82,7 @@ Probada en Chrome; debería funcionar en otros navegadores basados en Chromium (
 | Elemento | Dónde | Para qué |
 |---|---|---|
 | Pestaña lateral | Borde derecho | Abre el panel. El punto indica el estado: verde activo, gris en pausa. |
-| Filtrado automático | Panel | Pausa el filtro sin perder la selección. |
+| Configuración | Panel, sección plegable | Interruptor por función; el del filtro lo pausa sin perder la selección. |
 | Pastilla de precio | Junto al precio de cada anuncio | Diferencia respecto a la media. |
 | Botón del ojo | Esquina superior derecha de cada anuncio | Marca o desmarca el anuncio como visto (velo gris). Se puede deshacer pulsando de nuevo. |
 | Chip del vendedor | Bajo el título | Clic para copiar su ID; **Bloquear** oculta todos sus anuncios. |
