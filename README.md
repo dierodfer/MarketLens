@@ -6,7 +6,7 @@
 
 **Mira Wallapop con lupa.** Filtra los anuncios reservados, compara cada precio con la media de la búsqueda y oculta a los vendedores que no te interesan.
 
-[![CI](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml)
+[![CI](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml/badge.svg?event=pull_request)](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml)
 [![Versión](https://img.shields.io/github/manifest-json/v/dierodfer/MarketLens/master?label=versi%C3%B3n&color=0071e3)](manifest.json)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-0071e3?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
 [![Tests: Playwright](https://img.shields.io/badge/tests-Playwright-2ead33?logo=playwright&logoColor=white)](tests/e2e)
@@ -56,7 +56,7 @@
 git clone https://github.com/dierodfer/MarketLens.git
 ```
 
-**Desde CI**: cada ejecución de [GitHub Actions](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml) publica el artefacto `marketlens-extension` con el `.zip` listo para descomprimir.
+**Desde CI**: cada ejecución en verde de [GitHub Actions](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml) publica el artefacto `marketlens-extension`, un `.zip` listo para descomprimir.
 
 Después:
 
@@ -97,11 +97,11 @@ La extensión solo se ejecuta en `es.wallapop.com` y `www.wallapop.com` y no env
 
 ## Desarrollo
 
-Requisitos: **Node.js 22** y npm.
+Requisitos: **Node.js 24** (ver [`.nvmrc`](.nvmrc); funciona desde la 22) y npm.
 
 ```bash
 npm install
-npx playwright install chromium   # solo la primera vez
+npx playwright install chromium --no-shell   # solo la primera vez
 ```
 
 | Comando | Qué hace |
@@ -129,11 +129,22 @@ Qué se comprueba:
 - Los diálogos son propios de la extensión, nunca `confirm()` del navegador.
 - La página no lanza errores de JavaScript.
 
-El workflow [`ci.yml`](.github/workflows/ci.yml) se ejecuta en cada push a `master` y en cada pull request:
+El workflow [`ci.yml`](.github/workflows/ci.yml) se ejecuta **solo en pull requests contra `master`** (y a mano desde la pestaña Actions). No se lanza en los push a `master` ni cuando la PR solo toca documentación (`*.md`, `docs/`).
 
-1. **Sintaxis y manifest**: `npm run lint` y `npm run test:unit`.
-2. **Tests E2E**: `npm run test:e2e`; sube el informe y las capturas como artefacto `playwright-report`.
-3. **Empaquetado**: genera `marketlens.zip` como artefacto `marketlens-extension`.
+Un único job ordenado de lo más barato a lo más caro, para fallar cuanto antes:
+
+1. Sintaxis (`npm run lint`) y tests unitarios (`npm run test:unit`): no necesitan dependencias.
+2. `npm ci` e instalación de Chromium (sin headless shell ni paquetes del sistema).
+3. Tests E2E (`npm run test:e2e`). Si fallan, sube el informe de Playwright como artefacto `playwright-report`.
+4. Si todo pasa, publica la extensión como artefacto `marketlens-extension`.
+
+Otras decisiones:
+
+- **Concurrencia**: un push nuevo a la misma PR cancela la ejecución anterior que siga en curso.
+- **Seguridad**: permisos de solo lectura, actions fijadas por SHA y checkout sin credenciales persistidas.
+- **Actualizaciones**: [Dependabot](.github/dependabot.yml) propone cada semana las nuevas versiones de las actions y de Playwright.
+
+Para usar un Chromium ya instalado en lugar del de Playwright: `CHROMIUM_PATH=/ruta/a/chromium npm run test:e2e`. Tiene que ser Chromium: Google Chrome no permite cargar extensiones desde la línea de comandos.
 
 > Los tests no pueden detectar que Wallapop cambie su HTML o su API. Si la extensión deja de encontrar productos, revisa primero los selectores de `getSearchResults()` en `content.js`.
 
@@ -155,7 +166,10 @@ MarketLens/
 │   └── fixtures/            # Página de búsqueda simulada
 ├── scripts/check-syntax.mjs
 ├── playwright.config.js
-└── .github/workflows/ci.yml
+├── .nvmrc                   # Versión de Node.js
+└── .github/
+    ├── workflows/ci.yml     # CI en pull requests
+    └── dependabot.yml       # Actualización semanal de actions y Playwright
 ```
 
 ## Contribuir

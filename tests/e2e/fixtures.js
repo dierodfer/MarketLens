@@ -33,8 +33,13 @@ const test = base.extend({
   colorScheme: ['light', { option: true }],
 
   context: async ({ colorScheme }, use) => {
+    // CHROMIUM_PATH permite usar un Chromium ya instalado (no Chrome: no carga extensiones)
+    const browser = process.env.CHROMIUM_PATH
+      ? { executablePath: process.env.CHROMIUM_PATH }
+      : { channel: 'chromium' };
+
     const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
+      ...browser,
       colorScheme,
       viewport: { width: 1280, height: 720 },
       args: [
