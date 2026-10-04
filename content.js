@@ -16,40 +16,40 @@ const ML_ICONS = {
 };
 
 class WallapopFilter {
+  filterMode = 'all'; // 'all', 'reserved', 'available'
+  extensionEnabled = true;
+  isInitialized = false;
+  observer = null;
+  filterIndicator = null;
+
+  // Constante para límite de precio máximo
+  PRICE_MAX = 100000;
+
+  // Flag para detectar si el contexto está invalidado
+  contextInvalidated = false;
+
+  // Nuevas funcionalidades del injector
+  priceAnalysis = {
+    allPrices: [],
+    averagePrice: 0,
+    isComplete: false,
+    attempts: 0,
+    maxAttempts: 5
+  };
+
+  userBlocking = {
+    blockedUsers: new Set(),
+    blockedAdsCount: 0,
+    uniqueAuthors: new Set()
+  };
+
+  kpiStats = {
+    totalItems: 0,
+    matchedItems: 0,
+    apiItems: []
+  };
+
   constructor() {
-    this.filterMode = 'all'; // 'all', 'reserved', 'available'
-    this.extensionEnabled = true;
-    this.isInitialized = false;
-    this.observer = null;
-    this.filterIndicator = null;
-    
-    // Constante para límite de precio máximo
-    this.PRICE_MAX = 100000;
-    
-    // Flag para detectar si el contexto está invalidado
-    this.contextInvalidated = false;
-    
-    // Nuevas funcionalidades del injector
-    this.priceAnalysis = {
-      allPrices: [],
-      averagePrice: 0,
-      isComplete: false,
-      attempts: 0,
-      maxAttempts: 5
-    };
-    
-    this.userBlocking = {
-      blockedUsers: new Set(),
-      blockedAdsCount: 0,
-      uniqueAuthors: new Set()
-    };
-    
-    this.kpiStats = {
-      totalItems: 0,
-      matchedItems: 0,
-      apiItems: []
-    };
-    
     // Verificar contexto inmediatamente en el constructor
     this.checkContextValidity();
     
@@ -130,7 +130,7 @@ class WallapopFilter {
       });
     } catch (e) {
       console.warn('⚠️ Error enviando mensaje:', e);
-      callback && callback(null);
+      callback?.(null);
     }
   }
 
@@ -139,7 +139,7 @@ class WallapopFilter {
     if (this.contextInvalidated) return false;
     
     // Verificar si chrome está disponible
-    if (!chrome || !chrome.runtime) {
+    if (!chrome?.runtime) {
       console.warn('⚠️ Chrome runtime no disponible, activando modo fallback');
       this.contextInvalidated = true;
       return false;
@@ -157,7 +157,7 @@ class WallapopFilter {
       chrome.runtime.getURL('icons/icon16.png');
       return true;
     } catch (error) {
-      console.warn('⚠️ Contexto invalidado detectado, activando modo fallback');
+      console.warn('⚠️ Contexto invalidado detectado, activando modo fallback:', error.message);
       this.contextInvalidated = true;
       return false;
     }
@@ -166,7 +166,7 @@ class WallapopFilter {
   // Verificar si podemos usar Chrome APIs de forma segura
   canUseChromeAPIs() {
     // Verificaciones básicas
-    if (!chrome || !chrome.runtime) return false;
+    if (!chrome?.runtime) return false;
     if (this.contextInvalidated) return false;
     
     // Verificar si las funciones específicas están disponibles
@@ -179,7 +179,7 @@ class WallapopFilter {
       return true;
     } catch (error) {
       // Si falla, marcar como invalidado
-      if (error.message && error.message.includes('Extension context invalidated')) {
+      if (error.message?.includes('Extension context invalidated')) {
         console.warn('⚠️ Contexto invalidado detectado en verificación, activando modo fallback');
         this.contextInvalidated = true;
       }
@@ -282,7 +282,7 @@ class WallapopFilter {
         this.updateStatusIndicators();
       }, 100);
     } catch (error) {
-      console.log('⚠️ No se pudo cargar configuración, usando valores por defecto');
+      console.warn('⚠️ No se pudo cargar configuración, usando valores por defecto:', error.message);
       this.extensionEnabled = true;
     }
   }
@@ -341,7 +341,7 @@ class WallapopFilter {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
           for (const node of mutation.addedNodes) {
             if (node.nodeType === Node.ELEMENT_NODE) {
-              const newProducts = node.matches && node.matches('.item-card_ItemCard--vertical__CNrfk') ? [node] : 
+              const newProducts = node.matches?.('.item-card_ItemCard--vertical__CNrfk') ? [node] : 
                                  node.querySelectorAll ? node.querySelectorAll('.item-card_ItemCard--vertical__CNrfk') : [];
               
               if (newProducts.length > 0) {
@@ -466,7 +466,7 @@ class WallapopFilter {
 
     // 2) fallback por contenido "€" dentro de la card
     const all = Array.from(root.querySelectorAll('strong, span, div, p'));
-    const withEuro = all.filter(el => el.textContent && el.textContent.includes('€'));
+    const withEuro = all.filter(el => el.textContent?.includes('€'));
     if (withEuro.length) {
       console.log(`💰 Encontrados ${withEuro.length} elementos de precio por contenido "€"`);
       return withEuro;
@@ -482,8 +482,8 @@ class WallapopFilter {
     
     // Normalizar texto del precio para formato europeo
     const text = priceElement.textContent
-      .replace(/\s|&nbsp;/g, '')  // Eliminar espacios y &nbsp;
-      .replace(/\./g, '')         // Eliminar puntos (separadores de miles)
+      .replaceAll(/\s|&nbsp;/g, '')  // Eliminar espacios y &nbsp;
+      .replaceAll('.', '')            // Eliminar puntos (separadores de miles)
       .replace(',', '.');         // Convertir coma a punto decimal
     
     // Buscar patrón de número con decimales opcionales
@@ -1570,7 +1570,7 @@ class WallapopFilter {
 
   // Punto de estado de la pestaña: verde activo, gris en pausa
   updateStatusIndicators() {
-    const dot = this.sidebarTab && this.sidebarTab.querySelector('#ml-tab-dot');
+    const dot = this.sidebarTab?.querySelector('#ml-tab-dot');
     if (dot) dot.classList.toggle('ml-on', this.extensionEnabled !== false);
   }
 

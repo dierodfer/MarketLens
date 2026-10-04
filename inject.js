@@ -58,7 +58,7 @@
     XMLHttpRequest.prototype.send = function(data) {
         // Solo interceptar llamadas de búsqueda principal (search?)
         // Para futuras implementaciones: agregar && !this._url.includes('components') si se quiere excluir components
-        if (this._url && this._url.includes('api.wallapop.com/api/v3/search?') && !this._url.includes('searchalerts')) {
+        if (this._url?.includes('api.wallapop.com/api/v3/search?') && !this._url.includes('searchalerts')) {
             console.log('🎯 Interceptando XMLHttpRequest a Wallapop API:', this._url);
             
             const originalOnReadyStateChange = this.onreadystatechange;
@@ -97,9 +97,9 @@
             const userIds = new Set();
             
             // Buscar user_ids en diferentes estructuras de datos
-            if (data && data.data) {
+            if (data?.data) {
                 // Estructura: data.section.payload.items
-                if (data.data.section && data.data.section.payload && data.data.section.payload.items) {
+                if (data.data.section?.payload?.items) {
                     data.data.section.payload.items.forEach(item => {
                         if (item.user_id) {
                             userIds.add(item.user_id);
@@ -142,19 +142,16 @@
             
             // Extraer también los items completos para hacer matching con el HTML
             const items = [];
-            if (data && data.data) {
+            if (data?.data) {
                 console.log('🔍 Estructura de datos encontrada:', Object.keys(data.data));
                 
                 // Estructura: data.section.payload.items
-                if (data.data.section && data.data.section.payload && data.data.section.payload.items) {
+                if (data.data.section?.payload?.items) {
                     console.log(`📦 Procesando ${data.data.section.payload.items.length} items de data.section.payload.items`);
                     data.data.section.payload.items.forEach((item, index) => {
                         if (item.user_id && item.title) {
                             // Extraer URL de imagen medium si existe
-                            let imageUrl = null;
-                            if (item.images && item.images.length > 0 && item.images[0].urls && item.images[0].urls.medium) {
-                                imageUrl = item.images[0].urls.medium;
-                            }
+                            const imageUrl = item.images?.[0]?.urls?.medium ?? null;
                             
                             console.log(`📝 Item ${index + 1}: ${item.title} | User ID: ${item.user_id} | Image URL: ${imageUrl}`);
                             
@@ -174,10 +171,7 @@
                     data.data.search_objects.forEach((item, index) => {
                         if (item.user_id && item.title) {
                             // Extraer URL de imagen medium si existe
-                            let imageUrl = null;
-                            if (item.images && item.images.length > 0 && item.images[0].urls && item.images[0].urls.medium) {
-                                imageUrl = item.images[0].urls.medium;
-                            }
+                            const imageUrl = item.images?.[0]?.urls?.medium ?? null;
                             
                             console.log(`📝 Item ${index + 1}: ${item.title} | User ID: ${item.user_id} | Image URL: ${imageUrl}`);
                             

@@ -24,7 +24,7 @@ class SimplePopup {
         return;
       }
 
-      if (!tab.url || !tab.url.includes('wallapop.com')) {
+      if (!tab.url?.includes('wallapop.com')) {
         this.setConnection('Abre una búsqueda en Wallapop', 'warn');
         return;
       }
@@ -32,7 +32,7 @@ class SimplePopup {
       // Intentar obtener estado del content script
       const response = await this.sendMessageToContentScript(tab.id, { action: 'getStatus' });
 
-      if (response && response.success) {
+      if (response?.success) {
         this.updateStatus(response);
         this.setConnection('Conectado a Wallapop', 'ok');
       } else {
