@@ -1,2 +1,5 @@
 publi/
 injector/
+node_modules/
+test-results/
+playwright-report/

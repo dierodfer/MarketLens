@@ -1,73 +1,175 @@
-# MarketLens
+<div align="center">
 
 <img src="icons/icon128.png" alt="MarketLens" width="96">
 
-Extensión de Chrome para Wallapop: filtra los anuncios reservados, compara cada precio con la media de la búsqueda y oculta vendedores que no te interesan.
+# MarketLens
 
-Basada en [Reserve Sniper](https://github.com/MartinGoDev/Reserve-Sniper-Extension) de MartinGoDev.
+**Mira Wallapop con lupa.** Filtra los anuncios reservados, compara cada precio con la media de la búsqueda y oculta a los vendedores que no te interesan.
+
+[![CI](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml)
+[![Versión](https://img.shields.io/github/manifest-json/v/dierodfer/MarketLens/master?label=versi%C3%B3n&color=0071e3)](manifest.json)
+[![Manifest V3](https://img.shields.io/badge/Manifest-V3-0071e3?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
+[![Tests: Playwright](https://img.shields.io/badge/tests-Playwright-2ead33?logo=playwright&logoColor=white)](tests/e2e)
+[![JavaScript](https://img.shields.io/badge/JavaScript-ES2020-f7df1e?logo=javascript&logoColor=black)](content.js)
+[![Último commit](https://img.shields.io/github/last-commit/dierodfer/MarketLens/master?label=%C3%BAltimo%20commit)](https://github.com/dierodfer/MarketLens/commits/master)
+
+</div>
+
+<p align="center">
+  <img src="docs/screenshot-light.png" alt="Panel de MarketLens en modo claro" width="49%">
+  <img src="docs/screenshot-dark.png" alt="Panel de MarketLens en modo oscuro" width="49%">
+</p>
+<p align="center"><sub>Capturas generadas por los tests sobre una página que imita a Wallapop.</sub></p>
+
+---
+
+## Índice
+
+- [Características](#características)
+- [Instalación](#instalación)
+- [Uso](#uso)
+- [Cómo funciona](#cómo-funciona)
+- [Desarrollo](#desarrollo)
+- [Tests e integración continua](#tests-e-integración-continua)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Contribuir](#contribuir)
+- [Créditos](#créditos)
 
 ## Características
 
-- **Filtro de reservas**: muestra todos los anuncios, solo los disponibles o solo los reservados, también los que se cargan al hacer scroll.
-- **Análisis de precios**: precio medio y rango de la búsqueda, y en cada anuncio cuánto está por encima (rojo) o por debajo (verde) de la media.
-- **Bloqueo de vendedores**: cada anuncio muestra el ID del vendedor (clic para copiarlo) y un botón para ocultar todos sus anuncios.
-- **Ocultar anuncios sueltos** con la × de cada tarjeta.
-- **Panel lateral** con métricas en tiempo real; sigue el modo claro/oscuro del sistema.
+| | Función | Qué hace |
+|---|---|---|
+| 🔎 | **Filtro de reservas** | Muestra todos los anuncios, solo los disponibles o solo los reservados. Se aplica también a los que se cargan al hacer scroll. |
+| 📈 | **Análisis de precios** | Calcula el precio medio y el rango de la búsqueda, y marca en cada anuncio cuánto está por encima (rojo) o por debajo (verde) de la media. |
+| 🚫 | **Bloqueo de vendedores** | Muestra el ID del vendedor en cada anuncio (clic para copiarlo) y permite ocultar todos sus anuncios de una vez. |
+| ✕ | **Ocultar anuncios sueltos** | Quita de la página un anuncio concreto y recalcula la media sin él. |
+| 🌗 | **Modo claro y oscuro** | El panel sigue la apariencia del sistema. |
+| 💾 | **Preferencias guardadas** | El filtro elegido y el estado del interruptor se recuerdan entre sesiones. |
 
 ## Instalación
 
-1. Clona el repositorio:
-   ```bash
-   git clone https://github.com/dierodfer/MarketLens.git
-   ```
-2. Abre `chrome://extensions/` y activa el **modo desarrollador**.
-3. Pulsa **Cargar descomprimida** y selecciona la carpeta del proyecto.
+> MarketLens todavía no está en la Chrome Web Store; se instala en modo desarrollador.
+
+**Desde el código**
+
+```bash
+git clone https://github.com/dierodfer/MarketLens.git
+```
+
+**Desde CI**: cada ejecución de [GitHub Actions](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml) publica el artefacto `marketlens-extension` con el `.zip` listo para descomprimir.
+
+Después:
+
+1. Abre `chrome://extensions/`.
+2. Activa el **Modo de desarrollador** (arriba a la derecha).
+3. Pulsa **Cargar descomprimida** y elige la carpeta del proyecto.
+
+Probada en Chrome; debería funcionar en otros navegadores basados en Chromium (Edge, Brave…).
 
 ## Uso
 
-1. Busca algo en [Wallapop](https://es.wallapop.com).
-2. Pulsa la pestaña de MarketLens en el borde derecho de la pantalla para abrir el panel.
-3. Elige **Todos**, **Disponibles** o **Reservados**. El interruptor **Filtrado automático** pausa el filtro sin perder la selección.
+1. Haz una búsqueda en [es.wallapop.com](https://es.wallapop.com).
+2. Pulsa la pestaña de MarketLens en el borde derecho de la pantalla.
+3. En **Mostrar**, elige **Todos**, **Disponibles** o **Reservados**.
 
-El punto bajo el logo de la pestaña indica el estado: verde activo, gris en pausa.
+| Elemento | Dónde | Para qué |
+|---|---|---|
+| Pestaña lateral | Borde derecho | Abre el panel. El punto indica el estado: verde activo, gris en pausa. |
+| Filtrado automático | Panel | Pausa el filtro sin perder la selección. |
+| Pastilla de precio | Junto al precio de cada anuncio | Diferencia respecto a la media. |
+| Chip del vendedor | Bajo el título | Clic para copiar su ID; **Bloquear** oculta todos sus anuncios. |
+| Precio medio | Esquina inferior izquierda | Media y número de anuncios analizados. |
+| Icono de la barra | Barra de Chrome | Estado de la conexión con la pestaña de Wallapop. |
 
-## Estructura
+## Cómo funciona
+
+```
+Wallapop ──fetch /api/v3/search──▶ inject.js ──postMessage──▶ content.js ──▶ panel, filtros y precios
+                                   (contexto de la página)     (content script)
+```
+
+- **Productos**: se detectan con `.item-card_ItemCard--vertical__CNrfk` y, como respaldo, `a[href*="/item/"]`. Un `MutationObserver` aplica el filtro a los que se cargan después.
+- **Reservas**: un anuncio está reservado si contiene `wallapop-badge[badge-type="reserved"]` o una insignia con el texto "Reservado".
+- **Vendedores**: `inject.js` lee las respuestas de la API de búsqueda y `content.js` empareja cada anuncio con su vendedor por la URL de la imagen.
+- **Preferencias**: se guardan con `chrome.storage.local`.
+
+La extensión solo se ejecuta en `es.wallapop.com` y `www.wallapop.com` y no envía datos a ningún servidor.
+
+## Desarrollo
+
+Requisitos: **Node.js 22** y npm.
+
+```bash
+npm install
+npx playwright install chromium   # solo la primera vez
+```
+
+| Comando | Qué hace |
+|---|---|
+| `npm run lint` | Comprueba la sintaxis de todos los scripts de la extensión. |
+| `npm run test:unit` | Valida el manifest, los iconos y los ficheros referenciados. |
+| `npm run test:e2e` | Carga la extensión en Chromium y la prueba sobre Wallapop simulado. |
+| `npm test` | Todo lo anterior. |
+
+Para depurar en una página real de Wallapop:
+
+- `Alt+Shift+D`: resumen de disponibles y reservados en la consola.
+- `testReservedFilter()` y `showAllProducts()` desde la consola de la página.
+
+## Tests e integración continua
+
+Los tests E2E usan [Playwright](https://playwright.dev) con la extensión cargada de verdad en Chromium. Wallapop, su API y las imágenes se sirven en local desde [`tests/fixtures/search.html`](tests/fixtures/search.html), así que los tests no dependen de la red ni de los cambios de la web real.
+
+Qué se comprueba:
+
+- El panel se inyecta una sola vez, se abre y se cierra, y no se duplica al navegar.
+- Los filtros muestran los anuncios correctos y la preferencia sobrevive a una recarga.
+- La media, el rango y las diferencias de precio son correctos y se recalculan al cargar más anuncios.
+- Cada anuncio muestra su vendedor según la API; bloquearlo oculta sus anuncios y actualiza la media.
+- Los diálogos son propios de la extensión, nunca `confirm()` del navegador.
+- La página no lanza errores de JavaScript.
+
+El workflow [`ci.yml`](.github/workflows/ci.yml) se ejecuta en cada push a `master` y en cada pull request:
+
+1. **Sintaxis y manifest**: `npm run lint` y `npm run test:unit`.
+2. **Tests E2E**: `npm run test:e2e`; sube el informe y las capturas como artefacto `playwright-report`.
+3. **Empaquetado**: genera `marketlens.zip` como artefacto `marketlens-extension`.
+
+> Los tests no pueden detectar que Wallapop cambie su HTML o su API. Si la extensión deja de encontrar productos, revisa primero los selectores de `getSearchResults()` en `content.js`.
+
+## Estructura del proyecto
 
 ```
 MarketLens/
-├── manifest.json     # Configuración (Manifest V3)
-├── content.js        # Panel, filtro, análisis de precios y bloqueo (se inyecta en Wallapop)
-├── inject.js         # Lee las respuestas de la API de búsqueda para obtener los vendedores
-├── background.js     # Service worker
-├── styles.css        # Estilos del panel y de los elementos sobre las tarjetas
-├── popup.html/.js    # Popup del icono de la extensión
-└── icons/            # Icono de la extensión (SVG fuente y PNG 16/32/48/128)
+├── manifest.json            # Configuración de la extensión (Manifest V3)
+├── content.js               # Panel, filtro, análisis de precios y bloqueo
+├── inject.js                # Lee las respuestas de la API de búsqueda
+├── background.js            # Service worker
+├── styles.css               # Estilos del panel y de los elementos sobre las tarjetas
+├── popup.html · popup.js    # Popup del icono de la extensión
+├── icons/                   # Icono (SVG fuente y PNG 16/32/48/128)
+├── docs/                    # Capturas del README
+├── tests/
+│   ├── unit/                # Tests del manifest (node:test)
+│   ├── e2e/                 # Tests de Playwright y su fixture
+│   └── fixtures/            # Página de búsqueda simulada
+├── scripts/check-syntax.mjs
+├── playwright.config.js
+└── .github/workflows/ci.yml
 ```
 
-## Detalles técnicos
+## Contribuir
 
-- Detecta productos con `.item-card_ItemCard--vertical__CNrfk` y, como respaldo, `a[href*="/item/"]`.
-- Un anuncio está reservado si contiene `wallapop-badge[badge-type="reserved"]` o una insignia con el texto "Reservado".
-- Los vendedores se emparejan con las tarjetas por la URL de la imagen que devuelve la API.
-- Las preferencias se guardan con `chrome.storage.local`.
+1. Haz un fork y crea una rama: `git checkout -b mi-mejora`.
+2. Haz tus cambios y ejecuta `npm test`.
+3. Abre un pull request; la CI tiene que quedar en verde.
 
-### Depuración
-
-- `Alt+Shift+D`: resumen de disponibles/reservados en la consola.
-- `testReservedFilter()` y `showAllProducts()` desde la consola de la página.
-
-## Apoyo
-
-[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-yellow.svg)](https://buymeacoffee.com/martingodeg)
-
-## Reportar bugs
-
-Abre un issue en [github.com/dierodfer/MarketLens/issues](https://github.com/dierodfer/MarketLens/issues) con los pasos para reproducirlo.
+¿Has encontrado un fallo? Abre un [issue](https://github.com/dierodfer/MarketLens/issues) con los pasos para reproducirlo y, si puedes, la URL de la búsqueda.
 
 ## Créditos
 
-Proyecto original: **Reserve Sniper** de [MartinGoDev](https://github.com/MartinGoDev) ([LinkedIn](https://www.linkedin.com/in/martin-gonzalez-fernandez-258559142/)).
+Basado en [Reserve Sniper](https://github.com/MartinGoDev/Reserve-Sniper-Extension) de [MartinGoDev](https://github.com/MartinGoDev).
 
-## Licencia
+Si te resulta útil, puedes apoyar al autor original:
 
-MIT.
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/martingodeg)
