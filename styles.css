@@ -247,6 +247,64 @@
 }
 
 /* Control segmentado */
+/* Configuración plegable */
+.ml-settings__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.ml-settings__summary::-webkit-details-marker {
+  display: none;
+}
+
+.ml-settings__summary::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--ml-text-2);
+  border-bottom: 2px solid var(--ml-text-2);
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+}
+
+.ml-settings[open] > .ml-settings__summary::after {
+  transform: rotate(-135deg);
+}
+
+.ml-settings__body {
+  border-top: 1px solid var(--ml-separator);
+}
+
+.ml-settings__body .ml-toggle-row + .ml-toggle-row {
+  border-top: 1px solid var(--ml-separator);
+}
+
+.ml-switch input:disabled + .ml-switch__track {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Funciones desactivadas: ml-off-<clave> en <html> oculta sus elementos */
+html.ml-off-prices #wallapop-average-price-display,
+html.ml-off-prices .wallapop-price-indicator,
+html.ml-off-prices .ml-row-prices,
+html.ml-off-sellers .wallapop-user-id-container,
+html.ml-off-blocking .wallapop-delete-user-btn,
+html.ml-off-blocking .ml-row-blocking,
+html.ml-off-hide .wallapop-delete-ad-btn,
+html.ml-off-seen .ml-seen-btn,
+html.ml-off-seen .ml-seen-veil,
+html.ml-off-seen .ml-row-seen {
+  display: none !important;
+}
+
 .ml-section-label {
   font-size: 12px;
   font-weight: 600;

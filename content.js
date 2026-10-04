@@ -1,6 +1,16 @@
 // MarketLens - Content Script
 // Filtra, analiza precios y bloquea vendedores en los resultados de Wallapop
 
+// Funciones que cada usuario puede activar o desactivar en la configuración
+const ML_FEATURES = [
+  { key: 'filter', title: 'Filtro de reservas', description: 'Muestra solo disponibles o reservados' },
+  { key: 'prices', title: 'Análisis de precios', description: 'Media, rango y diferencia en cada anuncio' },
+  { key: 'sellers', title: 'Vendedor de cada anuncio', description: 'Muestra su ID y permite copiarlo' },
+  { key: 'blocking', title: 'Bloquear vendedores', description: 'Oculta todos los anuncios de un vendedor' },
+  { key: 'hide', title: 'Ocultar anuncios', description: 'Botón × para quitar un anuncio' },
+  { key: 'seen', title: 'Marcar como visto', description: 'Velo gris en los anuncios ya revisados' }
+];
+
 // Iconos de línea (SVG inline, heredan el color del texto)
 const ML_SVG = (size, body, extra = '') =>
   `<svg class="ml-icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${body}</svg>`;
@@ -25,6 +35,9 @@ class WallapopFilter {
 
   // Constante para límite de precio máximo
   PRICE_MAX = 100000;
+
+  // Funciones activables (el filtro se guarda aparte, en extensionEnabled)
+  features = { prices: true, sellers: true, blocking: true, hide: true, seen: true };
 
   // Anuncios marcados como vistos (ruta /item/...) y máximo que se recuerda
   seenItems = new Set();
@@ -223,6 +236,9 @@ class WallapopFilter {
       try { chrome.runtime.onMessage.removeListener(this.onRuntimeMessage); } catch (e) {}
     }
     
+    // Quitar las clases de funciones desactivadas
+    this.clearFeatureClasses();
+    
     // Quitar botones y velos de "visto": la instancia nueva los vuelve a crear
     document.querySelectorAll('.ml-seen-btn, .ml-seen-veil').forEach((element) => element.remove());
     
@@ -278,21 +294,22 @@ class WallapopFilter {
 
   async loadSettings() {
     try {
-      const result = await chrome.storage.local.get(['filterMode', 'extensionEnabled', 'seenItems']);
+      const result = await chrome.storage.local.get(['filterMode', 'extensionEnabled', 'features', 'seenItems']);
       this.filterMode = result.filterMode || 'all';
       this.extensionEnabled = result.extensionEnabled !== undefined ? result.extensionEnabled : true;
+      for (const key of Object.keys(this.features)) {
+        if (typeof result.features?.[key] === 'boolean') this.features[key] = result.features[key];
+      }
       if (Array.isArray(result.seenItems)) {
         this.seenItems = new Set(result.seenItems.filter((key) => typeof key === 'string'));
         this.refreshSeenMarks();
       }
       console.log(`📋 Configuración cargada - Filtro: ${this.filterMode}, Activa: ${this.extensionEnabled}`);
       
-      // Actualizar toggle en el sidebar si existe
-      setTimeout(() => {
-        const toggle = document.querySelector('#extension-toggle');
-        if (toggle) toggle.checked = this.extensionEnabled;
-        this.updateStatusIndicators();
-      }, 100);
+      // Reflejar la configuración en la página y en el panel
+      this.applyFeatureClasses();
+      this.syncSettingsUi();
+      this.updateStatusIndicators();
     } catch (error) {
       console.warn('⚠️ No se pudo cargar configuración, usando valores por defecto:', error.message);
       this.extensionEnabled = true;
@@ -557,6 +574,76 @@ class WallapopFilter {
 
     priceElement.parentNode.insertBefore(indicator, priceElement.nextSibling);
     console.log(`✅ Indicador agregado: ${price}€ - ${indicator.textContent}`);
+  }
+
+  // ===== CONFIGURACIÓN: activar y desactivar funciones =====
+
+  isFeatureEnabled(key) {
+    if (key === 'filter') return this.extensionEnabled;
+    return this.features[key] !== false;
+  }
+
+  // Cada función desactivada añade ml-off-<clave> a <html>; el CSS oculta sus elementos
+  applyFeatureClasses() {
+    for (const key of Object.keys(this.features)) {
+      document.documentElement.classList.toggle(`ml-off-${key}`, !this.features[key]);
+    }
+  }
+
+  clearFeatureClasses() {
+    for (const key of Object.keys(this.features)) {
+      document.documentElement.classList.remove(`ml-off-${key}`);
+    }
+  }
+
+  // Interruptores del panel: estado actual; bloquear depende de ver al vendedor
+  syncSettingsUi() {
+    this.filterIndicator?.querySelectorAll('input[data-feature]').forEach((input) => {
+      input.checked = this.isFeatureEnabled(input.dataset.feature);
+      if (input.dataset.feature === 'blocking') input.disabled = !this.features.sellers;
+    });
+  }
+
+  saveSettings(values) {
+    const warn = (error) => console.warn('⚠️ No se pudo guardar la configuración:', error.message);
+    try {
+      chrome.storage.local.set(values).catch(warn);
+    } catch (error) {
+      warn(error);
+    }
+  }
+
+  setFeatureEnabled(key, enabled) {
+    if (key === 'filter') {
+      this.setFilterEnabled(enabled);
+      return;
+    }
+    if (!(key in this.features)) return;
+
+    this.features[key] = enabled;
+    this.applyFeatureClasses();
+    this.syncSettingsUi();
+    this.saveSettings({ features: { ...this.features } });
+    console.log(`⚙️ Función ${key}: ${enabled ? 'activada' : 'desactivada'}`);
+  }
+
+  // El filtro de reservas: al pausarlo se muestran todos los anuncios
+  setFilterEnabled(enabled) {
+    this.extensionEnabled = enabled;
+
+    if (enabled) {
+      this.applyFilter();
+    } else {
+      this.getSearchResults().forEach((product) => {
+        const card = product.closest('article, li, [data-testid="item-card"], .ItemCard, .item-card, [class*="ItemCard"], [class*="Card"]') || product;
+        card.classList.remove('rs-hidden');
+      });
+    }
+
+    this.saveSettings({ extensionEnabled: enabled });
+    this.syncSettingsUi();
+    this.updateStatusIndicators();
+    setTimeout(() => this.updateFilterIndicator(), 100);
   }
 
   // ===== MARCAR COMO VISTO =====
@@ -1573,17 +1660,6 @@ class WallapopFilter {
         </button>
       </div>
 
-      <div class="ml-card ml-toggle-row">
-        <div class="ml-toggle-row__text">
-          <span class="ml-toggle-row__title">Filtrado automático</span>
-          <span class="ml-subtitle">Aplica el filtro al cargar anuncios</span>
-        </div>
-        <label class="ml-switch">
-          <input type="checkbox" id="extension-toggle" checked aria-label="Filtrado automático">
-          <span class="ml-switch__track"></span>
-        </label>
-      </div>
-
       <div>
         <span class="ml-section-label">Mostrar</span>
         <div class="ml-segmented" role="group" aria-label="Filtro de anuncios">
@@ -1609,19 +1685,19 @@ class WallapopFilter {
       </div>
 
       <div class="ml-card ml-list">
-        <div class="ml-list__row">
+        <div class="ml-list__row ml-row-prices">
           <span>Precio medio</span>
           <span class="ml-list__value ml-list__value--strong" id="ml-avg-price">–</span>
         </div>
-        <div class="ml-list__row">
+        <div class="ml-list__row ml-row-prices">
           <span>Rango</span>
           <span class="ml-list__value" id="ml-price-range">–</span>
         </div>
-        <div class="ml-list__row">
+        <div class="ml-list__row ml-row-blocking">
           <span>Vendedores bloqueados</span>
           <span class="ml-list__value" id="ml-blocked">0 · 0 anuncios</span>
         </div>
-        <div class="ml-list__row">
+        <div class="ml-list__row ml-row-seen">
           <span>Vistos</span>
           <span class="ml-list__value ml-list__actions">
             <span id="ml-seen-count">0 en esta página</span>
@@ -1629,6 +1705,23 @@ class WallapopFilter {
           </span>
         </div>
       </div>
+
+      <details class="ml-card ml-settings" id="ml-settings">
+        <summary class="ml-settings__summary">Configuración</summary>
+        <div class="ml-settings__body">
+          ${ML_FEATURES.map((feature) => `
+          <div class="ml-toggle-row">
+            <div class="ml-toggle-row__text">
+              <span class="ml-toggle-row__title">${feature.title}</span>
+              <span class="ml-subtitle">${feature.description}</span>
+            </div>
+            <label class="ml-switch">
+              <input type="checkbox" data-feature="${feature.key}"${feature.key === 'filter' ? ' id="extension-toggle"' : ''} aria-label="${feature.title}">
+              <span class="ml-switch__track"></span>
+            </label>
+          </div>`).join('')}
+        </div>
+      </details>
 
       <div class="ml-spacer"></div>
 
@@ -1657,6 +1750,7 @@ class WallapopFilter {
     document.body.appendChild(this.sidebarTab);
 
     this.setupSidebarEvents();
+    this.syncSettingsUi();
     this.updatePriceSummary();
     this.updateKpiDisplay();
 
@@ -1750,32 +1844,11 @@ class WallapopFilter {
       this.clearSeenItems().catch((error) => console.warn('⚠️ Error borrando vistos:', error.message));
     });
 
-    // Interruptor de filtrado automático
+    // Interruptores de la configuración (uno por función)
     const extensionToggle = this.filterIndicator.querySelector('#extension-toggle');
-    if (extensionToggle) {
-      extensionToggle.addEventListener('change', (e) => {
-        const isEnabled = e.target.checked;
-        this.extensionEnabled = isEnabled;
-
-        if (isEnabled) {
-          this.applyFilter();
-          console.log('✅ Filtrado activado');
-        } else {
-          // Mostrar todos los productos
-          this.getSearchResults().forEach(product => {
-            const card = product.closest('article, li, [data-testid="item-card"], .ItemCard, .item-card, [class*="ItemCard"], [class*="Card"]') || product;
-            card.classList.remove('rs-hidden');
-          });
-          console.log('⏸️ Filtrado en pausa - mostrando todos los productos');
-        }
-
-        // Guardar estado
-        try { chrome.storage.local.set({ extensionEnabled: isEnabled }); } catch (err) {}
-
-        this.updateStatusIndicators();
-        setTimeout(() => this.updateFilterIndicator(), 100);
-      });
-    }
+    this.filterIndicator.querySelectorAll('input[data-feature]').forEach((input) => {
+      input.addEventListener('change', () => this.setFeatureEnabled(input.dataset.feature, input.checked));
+    });
 
     // Control segmentado de filtro
     this.filterIndicator.querySelectorAll('.sidebar-filter-btn').forEach(button => {
