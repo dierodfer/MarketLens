@@ -1,15 +1,16 @@
 // MarketLens - Popup
 class SimplePopup {
-  constructor() {
-    this.init();
-  }
-
   init() {
     const version = document.getElementById('version');
     if (version) version.textContent = `Versión ${chrome.runtime.getManifest().version}`;
 
-    this.loadCurrentStatus();
+    this.refresh();
     this.setupStatusUpdater();
+  }
+
+  // loadCurrentStatus() captura sus propios errores; el catch cubre lo imprevisto
+  refresh() {
+    this.loadCurrentStatus().catch((error) => console.error('❌ Error:', error));
   }
 
   async loadCurrentStatus() {
@@ -87,13 +88,12 @@ class SimplePopup {
   }
 
   setupStatusUpdater() {
-    setInterval(() => {
-      this.loadCurrentStatus();
-    }, 5000);
+    setInterval(() => this.refresh(), 5000);
   }
 }
 
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
-  new SimplePopup();
+  const popup = new SimplePopup();
+  popup.init();
 });

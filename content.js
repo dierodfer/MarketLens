@@ -251,7 +251,7 @@ class WallapopFilter {
     }
     
     // Cargar configuración guardada
-    this.loadSettings();
+    this.loadSettings().catch((error) => console.warn('⚠️ Error cargando configuración:', error.message));
     
     // Esperar a que la página cargue completamente
     this.waitForResults();
@@ -489,9 +489,9 @@ class WallapopFilter {
     // Buscar patrón de número con decimales opcionales
     const match = text.match(/(\d+(?:\.\d+)?)/);
     if (match) {
-      const price = parseFloat(match[1]);
+      const price = Number.parseFloat(match[1]);
       // Aumentar límite para vehículos y productos caros
-      if (price && !isNaN(price) && price <= 100000) {
+      if (price && !Number.isNaN(price) && price <= 100000) {
         return price;
       }
     }
@@ -698,7 +698,7 @@ class WallapopFilter {
     itemContainer.remove();
     this.userBlocking.blockedAdsCount++;
     
-    if (removedPrice && !isNaN(removedPrice)) {
+    if (removedPrice && !Number.isNaN(removedPrice)) {
       // Eliminar solo una ocurrencia del precio (no todas)
       const index = this.priceAnalysis.allPrices.indexOf(removedPrice);
       if (index > -1) {
@@ -730,7 +730,7 @@ class WallapopFilter {
 
     existingIndicators.forEach((indicator) => {
       // El precio se guarda en el propio indicador al crearlo
-      const price = parseFloat(indicator.dataset.price);
+      const price = Number.parseFloat(indicator.dataset.price);
       if (!price || price <= 0 || price > this.PRICE_MAX) return;
       this.renderPriceIndicator(indicator, price);
     });
@@ -1166,7 +1166,7 @@ class WallapopFilter {
                       renderUserId(item.user_id);
                       userIdElement.classList.remove('ml-copied');
                     }, 1000);
-                  });
+                  }).catch(() => this.showNotification('No se pudo copiar el ID', 'warning'));
                 });
 
                 deleteButton.addEventListener('click', async (e) => {

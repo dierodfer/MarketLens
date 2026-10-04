@@ -40,19 +40,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     if (msg.action === 'openConsole') {
-      (async () => {
-        try {
-          chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-            if (tabs[0]) {
-              chrome.tabs.sendMessage(tabs[0].id, {action: "focusConsole"});
-            }
-          });
-          sendResponse({ ok: true });
-        } catch (e) {
-          sendResponse({ ok: false, error: String(e) });
-        }
-      })();
-      return true; // <- crítico en async
+      try {
+        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+          if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id, {action: "focusConsole"});
+          }
+        });
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+      return true;
     }
 
     // fallback para acciones desconocidas
