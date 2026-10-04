@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Reserve Sniper",
+  "name": "MarketLens",
   "version": "1.0.0",
-  "description": "Encuentra productos reservados y disponibles en Wallapop como un francotirador",
+  "description": "Filtra anuncios reservados, compara precios y bloquea vendedores en Wallapop",
   "permissions": [
     "activeTab",
     "storage",
@@ -14,9 +14,16 @@
   ],
   "content_scripts": [
     {
-      "matches": ["*://es.wallapop.com/*", "*://www.wallapop.com/*"],
-      "js": ["content.js"],
-      "css": ["styles.css"],
+      "matches": [
+        "*://es.wallapop.com/*",
+        "*://www.wallapop.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
       "run_at": "document_end"
     }
   ],
@@ -25,24 +32,30 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Reserve Sniper",
+    "default_title": "MarketLens",
     "default_icon": {
-      "16": "icons/logo.png",
-      "32": "icons/logo.png",
-      "48": "icons/logo.png",
-      "128": "icons/logo.png"
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
     }
   },
   "icons": {
-    "16": "icons/logo.png",
-    "32": "icons/logo.png",
-    "48": "icons/logo.png",
-    "128": "icons/logo.png"
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "web_accessible_resources": [
     {
-      "resources": ["icons/*", "inject.js"],
-      "matches": ["*://es.wallapop.com/*", "*://www.wallapop.com/*"]
+      "resources": [
+        "icons/*",
+        "inject.js"
+      ],
+      "matches": [
+        "*://es.wallapop.com/*",
+        "*://www.wallapop.com/*"
+      ]
     }
   ]
 }

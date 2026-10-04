@@ -1,77 +1,60 @@
-// Reserve Sniper - Popup Simplificado
+// MarketLens - Popup
 class SimplePopup {
   constructor() {
     this.init();
   }
 
   init() {
-    console.log('🚀 Popup simplificado iniciado');
+    const version = document.getElementById('version');
+    if (version) version.textContent = `Versión ${chrome.runtime.getManifest().version}`;
+
     this.loadCurrentStatus();
     this.setupStatusUpdater();
   }
 
   async loadCurrentStatus() {
     try {
-      const [tab] = await chrome.tabs.query({ 
-        active: true, 
-        currentWindow: true 
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true
       });
-      
+
       if (!tab) {
-        this.showError('No se encontró pestaña activa');
-        return;
-      }
-      
-      if (!tab.url.includes('wallapop.com')) {
-        this.showError('No estás en Wallapop');
+        this.setConnection('No se encontró la pestaña activa', 'warn');
         return;
       }
 
-      console.log(`🔍 Conectando con: ${tab.url}`);
+      if (!tab.url || !tab.url.includes('wallapop.com')) {
+        this.setConnection('Abre una búsqueda en Wallapop', 'warn');
+        return;
+      }
 
       // Intentar obtener estado del content script
-      const response = await this.sendMessageToContentScript({ action: 'getStatus' });
+      const response = await this.sendMessageToContentScript(tab.id, { action: 'getStatus' });
 
       if (response && response.success) {
         this.updateStatus(response);
-        this.showSuccess('✅ Conectado');
+        this.setConnection('Conectado a Wallapop', 'ok');
       } else {
-        this.updateStatus({
-          totalResults: '?',
-          isInitialized: false,
-          filterMode: 'all'
-        });
-        this.showError('⚠️ Recarga la página');
+        this.updateStatus({ totalResults: '–', isInitialized: false, filterMode: 'all' });
+        this.setConnection('Recarga la página de Wallapop', 'warn');
       }
     } catch (error) {
       console.error('❌ Error:', error);
-      this.showError('Error de conexión');
+      this.setConnection('Error de conexión', 'warn');
     }
   }
 
-  async sendMessageToContentScript(message) {
-    try {
-      const [tab] = await chrome.tabs.query({ 
-        active: true, 
-        currentWindow: true 
+  sendMessageToContentScript(tabId, message) {
+    return new Promise((resolve) => {
+      chrome.tabs.sendMessage(tabId, message, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve(null);
+        } else {
+          resolve(response);
+        }
       });
-      
-      if (!tab) return null;
-      
-      return new Promise((resolve) => {
-        chrome.tabs.sendMessage(tab.id, message, (response) => {
-          if (chrome.runtime.lastError) {
-            console.error('❌ Error:', chrome.runtime.lastError.message);
-            resolve(null);
-          } else {
-            resolve(response);
-          }
-        });
-      });
-    } catch (error) {
-      console.error('❌ Error:', error);
-      return null;
-    }
+    });
   }
 
   updateStatus(statusData) {
@@ -82,7 +65,7 @@ class SimplePopup {
 
     const initElement = document.getElementById('initialization-status');
     if (initElement) {
-      initElement.textContent = statusData.isInitialized ? '✅ Sí' : '❌ No';
+      initElement.textContent = statusData.isInitialized ? 'Sí' : 'No';
     }
 
     const statusElement = document.getElementById('current-status');
@@ -96,47 +79,17 @@ class SimplePopup {
     }
   }
 
+  setConnection(message, type) {
+    const banner = document.getElementById('connection');
+    if (!banner) return;
+    banner.textContent = message;
+    banner.className = `banner ${type}`;
+  }
+
   setupStatusUpdater() {
     setInterval(() => {
       this.loadCurrentStatus();
     }, 5000);
-  }
-
-  showError(message) {
-    this.showNotification(message, 'error');
-  }
-
-  showSuccess(message) {
-    this.showNotification(message, 'success');
-  }
-
-  showNotification(message, type = 'info') {
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(n => n.remove());
-
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    notification.style.cssText = `
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 8px 16px;
-      border-radius: 4px;
-      font-size: 12px;
-      z-index: 1000;
-      background: ${type === 'error' ? '#dc3545' : '#28a745'};
-      color: white;
-    `;
-    
-    document.body.appendChild(notification);
-
-    setTimeout(() => {
-      if (notification.parentNode) {
-        notification.remove();
-      }
-    }, 2000);
   }
 }
 
@@ -144,5 +97,3 @@ class SimplePopup {
 document.addEventListener('DOMContentLoaded', () => {
   new SimplePopup();
 });
-
-console.log('✅ Popup simplificado cargado');

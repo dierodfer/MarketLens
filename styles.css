@@ -1,26 +1,686 @@
-/* Wallapop Filter Extension - Styles */
+/* MarketLens - Estilos inyectados en Wallapop */
 
-/* Indicador de filtro */
-#wallapop-filter-indicator {
-  position: fixed !important;
-  top: 10px !important;
-  right: 10px !important;
-  background: rgba(0, 0, 0, 0.8) !important;
-  color: white !important;
-  padding: 8px 12px !important;
-  border-radius: 4px !important;
-  font-size: 12px !important;
-  z-index: 10000 !important;
-  font-family: Arial, sans-serif !important;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+/* ===== Tokens ===== */
+.ml-root {
+  --ml-bg: #f5f5f7;
+  --ml-surface: #ffffff;
+  --ml-glass: rgba(250, 250, 252, 0.86);
+  --ml-text: #1d1d1f;
+  --ml-text-2: #6e6e73;
+  --ml-separator: #f0f0f2;
+  --ml-hairline: rgba(0, 0, 0, 0.06);
+  --ml-fill: rgba(118, 118, 128, 0.12);
+  --ml-accent: #0071e3;
+  --ml-link: #0066cc;
+  --ml-segment-on: #ffffff;
+  --ml-switch-off: #e5e5ea;
+  --ml-positive: #1a7f37;
+  --ml-positive-bg: #e8f5ec;
+  --ml-negative: #b42318;
+  --ml-negative-bg: #fdecea;
+  --ml-shadow: 0 8px 30px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif !important;
+  color: var(--ml-text);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.3;
+  letter-spacing: normal;
+  text-align: left;
 }
 
-/* Productos ocultos por la extensión */
-.wallapop-filter-hidden {
+@media (prefers-color-scheme: dark) {
+  .ml-root {
+    --ml-bg: #1c1c1e;
+    --ml-surface: #2c2c2e;
+    --ml-glass: rgba(28, 28, 30, 0.94);
+    --ml-text: #f5f5f7;
+    --ml-text-2: #a1a1a6;
+    --ml-separator: #3a3a3c;
+    --ml-hairline: rgba(255, 255, 255, 0.08);
+    --ml-fill: rgba(118, 118, 128, 0.24);
+    --ml-accent: #0a84ff;
+    --ml-link: #4da3ff;
+    --ml-segment-on: #636366;
+    --ml-switch-off: #39393d;
+    --ml-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+}
+
+.ml-root *,
+.ml-root *::before,
+.ml-root *::after {
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.ml-root a {
+  position: static !important;
+  display: flex !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  overflow: visible !important;
+}
+
+.ml-root button {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.ml-root button:focus-visible,
+.ml-root a:focus-visible,
+.ml-root input:focus-visible + .ml-switch__track {
+  outline: 3px solid rgba(0, 113, 227, 0.45);
+  outline-offset: 2px;
+}
+
+.ml-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* ===== Logo ===== */
+.ml-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--ml-accent);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ===== Panel lateral ===== */
+#ml-sidebar {
+  position: fixed !important;
+  top: 0 !important;
+  right: -380px !important;
+  width: 360px !important;
+  height: 100vh !important;
+  z-index: 2147483000 !important;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--ml-glass);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  border-left: 1px solid var(--ml-hairline);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.08);
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: right 0.32s cubic-bezier(0.32, 0.72, 0, 1) !important;
+}
+
+#ml-sidebar.ml-open {
+  right: 0 !important;
+}
+
+.ml-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ml-header__text {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ml-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.ml-subtitle {
+  font-size: 12px;
+  color: var(--ml-text-2);
+}
+
+.ml-icon-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ml-icon-btn__circle {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--ml-fill);
+  color: var(--ml-text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.ml-icon-btn:hover .ml-icon-btn__circle {
+  background: var(--ml-hairline);
+}
+
+.ml-card {
+  background: var(--ml-surface);
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--ml-hairline);
+}
+
+/* Interruptor */
+.ml-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 6px 6px 16px;
+}
+
+.ml-toggle-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+}
+
+.ml-toggle-row__title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ml-switch {
+  position: relative;
+  width: 64px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.ml-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.ml-switch__track {
+  width: 51px;
+  height: 31px;
+  border-radius: 999px;
+  background: var(--ml-switch-off);
+  position: relative;
+  display: block;
+  transition: background 0.2s ease;
+}
+
+.ml-switch__track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.ml-switch input:checked + .ml-switch__track {
+  background: var(--ml-accent);
+}
+
+.ml-switch input:checked + .ml-switch__track::after {
+  transform: translateX(20px);
+}
+
+/* Control segmentado */
+.ml-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ml-text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-left: 4px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.ml-segmented {
+  display: flex;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--ml-fill);
+}
+
+.ml-segmented button {
+  flex: 1 1 0;
+  height: 38px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ml-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.ml-segmented button.ml-active {
+  background: var(--ml-segment-on);
+  font-weight: 600;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+/* Métricas */
+.ml-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ml-metric {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ml-metric__label {
+  font-size: 11px;
+  color: var(--ml-text-2);
+}
+
+.ml-metric__value {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Lista agrupada */
+.ml-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.ml-list__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--ml-separator);
+}
+
+.ml-list__row:last-child {
+  border-bottom: none;
+}
+
+.ml-list__value {
+  color: var(--ml-text-2);
+  text-align: right;
+}
+
+.ml-list__value--strong {
+  color: var(--ml-text);
+  font-weight: 600;
+}
+
+.ml-spacer {
+  flex-grow: 1;
+}
+
+/* Pie */
+.ml-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ml-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  color: var(--ml-link) !important;
+  text-decoration: none !important;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+
+.ml-link:hover {
+  background: var(--ml-fill) !important;
+}
+
+.ml-version {
+  font-size: 11px;
+  color: var(--ml-text-2);
+  padding: 6px 12px 0;
+}
+
+/* ===== Pestaña lateral (panel cerrado) ===== */
+#ml-tab {
+  position: fixed !important;
+  right: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 2147482999 !important;
+  width: 52px;
+  height: 80px;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 14px 0 0 14px;
+  background: var(--ml-glass);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.10), 0 0 0 1px var(--ml-hairline);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: width 0.2s ease;
+}
+
+#ml-tab:hover {
+  width: 58px;
+}
+
+#ml-tab .ml-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+#ml-tab.ml-hidden {
   display: none !important;
 }
 
-/* Productos visibles por la extensión */
-.wallapop-filter-visible {
-  display: block !important;
+.ml-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8e8e93;
+  display: block;
+}
+
+.ml-status-dot.ml-on {
+  background: #30a14e;
+}
+
+/* ===== Precio medio flotante ===== */
+#wallapop-average-price-display {
+  position: fixed !important;
+  left: 20px !important;
+  bottom: 20px !important;
+  z-index: 2147482998 !important;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px 10px 12px;
+  border-radius: 16px;
+  background: var(--ml-glass);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--ml-shadow);
+}
+
+#wallapop-average-price-display .ml-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+.ml-avg__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ml-avg__label {
+  font-size: 11px;
+  color: var(--ml-text-2);
+}
+
+.ml-avg__value {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.ml-avg__count {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--ml-text-2);
+}
+
+/* ===== Elementos sobre las tarjetas de Wallapop ===== */
+.wallapop-price-indicator {
+  display: inline-block !important;
+  margin-left: 6px !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+  vertical-align: middle !important;
+  background: #f2f2f4 !important;
+  color: #6e6e73 !important;
+}
+
+.wallapop-price-indicator.ml-below {
+  background: #e8f5ec !important;
+  color: #1a7f37 !important;
+}
+
+.wallapop-price-indicator.ml-above {
+  background: #fdecea !important;
+  color: #b42318 !important;
+}
+
+.wallapop-delete-ad-btn {
+  position: absolute !important;
+  top: 2px !important;
+  right: 2px !important;
+  z-index: 999 !important;
+  width: 44px !important;
+  height: 44px !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.wallapop-delete-ad-btn .ml-hide-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+  color: #1d1d1f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+
+.wallapop-delete-ad-btn:hover .ml-hide-circle {
+  transform: scale(1.08);
+}
+
+.wallapop-user-id-container {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin-top: 6px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif !important;
+}
+
+.wallapop-user-id-display {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 4px 8px !important;
+  background: #f2f2f4 !important;
+  color: #6e6e73 !important;
+  font-size: 11px !important;
+  cursor: pointer !important;
+  max-width: 140px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wallapop-user-id-display.ml-copied {
+  background: #e8f5ec !important;
+  color: #1a7f37 !important;
+}
+
+.wallapop-delete-user-btn {
+  border: none !important;
+  background: transparent !important;
+  color: #b42318 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  padding: 4px 0 !important;
+  cursor: pointer !important;
+}
+
+.wallapop-delete-user-btn:hover {
+  text-decoration: underline;
+}
+
+/* ===== Aviso ===== */
+.ml-toast {
+  position: fixed !important;
+  top: 20px !important;
+  left: 50% !important;
+  z-index: 2147483001 !important;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(29, 29, 31, 0.9);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  transform: translate(-50%, -12px);
+  opacity: 0;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.ml-toast.ml-show {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+/* ===== Diálogo de confirmación ===== */
+.ml-dialog-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483002 !important;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.ml-dialog-backdrop.ml-show {
+  opacity: 1;
+}
+
+.ml-dialog {
+  width: 270px;
+  border-radius: 16px;
+  background: var(--ml-glass);
+  -webkit-backdrop-filter: blur(30px);
+  backdrop-filter: blur(30px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  text-align: center;
+  transform: scale(0.96);
+  transition: transform 0.18s ease;
+}
+
+.ml-dialog-backdrop.ml-show .ml-dialog {
+  transform: scale(1);
+}
+
+.ml-dialog__body {
+  padding: 18px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ml-dialog__title {
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ml-dialog__message {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ml-text-2);
+  text-align: center;
+}
+
+.ml-dialog__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--ml-separator);
+}
+
+.ml-dialog__actions button {
+  height: 44px;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  color: var(--ml-link);
+  cursor: pointer;
+}
+
+.ml-dialog__actions button:first-child {
+  border-right: 1px solid var(--ml-separator);
+}
+
+.ml-dialog__actions .ml-destructive {
+  color: #e5484d;
+  font-weight: 600;
+}
+
+/* ===== Filtrado ===== */
+.rs-hidden {
+  display: none !important;
 }

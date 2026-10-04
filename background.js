@@ -1,5 +1,5 @@
 chrome.runtime.onInstalled.addListener(() => {
-    console.log('🔍 Wallapop API Sniffer instalado');
+    console.log('🔍 MarketLens instalado');
 });
 
 chrome.webRequest.onBeforeRequest.addListener(

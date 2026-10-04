@@ -1,170 +1,189 @@
-# 🎯 Reserve Sniper - Chrome Extension
+<div align="center">
 
-Una extensión de Chrome que te permite filtrar productos en Wallapop como un francotirador, mostrando solo los productos disponibles, reservados o todos según tu preferencia.
+<img src="icons/icon128.png" alt="MarketLens" width="96">
 
-![Reserve Sniper Logo](icons/logo.png)
+# MarketLens
 
-## ✨ Características
+**Mira Wallapop con lupa.** Filtra los anuncios reservados, compara cada precio con la media de la búsqueda y oculta a los vendedores que no te interesan.
 
-- **🎯 Filtrado Inteligente**: Filtra productos por estado de reserva en tiempo real
-- **📱 Interfaz Intuitiva**: Sidebar lateral con controles fáciles de usar
-- **🔄 Actualización Automática**: Se adapta automáticamente a nuevos productos cargados
-- **⚡ Toggle On/Off**: Activa o desactiva la extensión cuando quieras
-- **🎨 Iconos Dinámicos**: Cambian según el filtro activo
-- **📊 Estadísticas en Tiempo Real**: Ve cuántos productos están visibles vs ocultos
+[![CI](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml/badge.svg?event=pull_request)](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml)
+[![Versión](https://img.shields.io/github/manifest-json/v/dierodfer/MarketLens/master?label=versi%C3%B3n&color=0071e3)](manifest.json)
+[![Manifest V3](https://img.shields.io/badge/Manifest-V3-0071e3?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3)
+[![Tests: Playwright](https://img.shields.io/badge/tests-Playwright-2ead33?logo=playwright&logoColor=white)](tests/e2e)
+[![JavaScript](https://img.shields.io/badge/JavaScript-ES2020-f7df1e?logo=javascript&logoColor=black)](content.js)
+[![Último commit](https://img.shields.io/github/last-commit/dierodfer/MarketLens/master?label=%C3%BAltimo%20commit)](https://github.com/dierodfer/MarketLens/commits/master)
 
-## 🚀 Instalación
+</div>
 
-### Desde el código fuente (Desarrolladores)
-
-1. **Clona el repositorio**:
-   ```bash
-   git clone https://github.com/MartinGoDev/Reserve-Sniper-Extension.git
-   cd Reserve-Sniper-Extension
-   ```
-
-2. **Abre Chrome** y ve a `chrome://extensions/`
-
-3. **Habilita el modo desarrollador** (toggle en la esquina superior derecha)
-
-4. **Haz clic en "Cargar descomprimida"**
-
-5. **Selecciona la carpeta del proyecto**
-
-6. **¡Listo!** La extensión aparecerá en tu barra de herramientas
-
-## 📖 Uso
-
-### Activación
-1. Ve a [Wallapop](https://www.wallapop.com) y busca productos
-2. Verás un **tab lateral** en el lado derecho de la pantalla
-3. Haz clic en el tab para abrir el **panel de control**
-
-### Filtros Disponibles
-
-- **📋 Mostrar Todos**: Muestra todos los productos (sin filtro)
-- **✅ Solo Disponibles**: Muestra únicamente productos disponibles para compra
-- **🔒 Solo Reservados**: Muestra únicamente productos que están reservados
-
-### Controles
-
-- **Toggle Principal**: Activa/desactiva toda la extensión
-- **Botones de Filtro**: Cambia entre los diferentes modos de visualización
-- **Estadísticas**: Ve cuántos productos están siendo mostrados
-
-## 🛠️ Tecnologías
-
-- **Manifest V3**: Última versión de extensiones de Chrome
-- **JavaScript ES6+**: Código moderno y eficiente
-- **CSS3**: Estilos avanzados con gradientes y animaciones
-- **Chrome APIs**: Storage, Tabs, Runtime
-- **MutationObserver**: Detección automática de cambios en la página
-
-## 📁 Estructura del Proyecto
-
-```
-Reserve-Sniper-Extension/
-├── manifest.json          # Configuración de la extensión
-├── popup.html             # Interfaz del popup
-├── popup.js               # Lógica del popup
-├── content.js             # Script principal (inyectado en Wallapop)
-├── styles.css             # Estilos adicionales
-└── icons/                 # Iconos de la extensión
-    ├── logo.png           # Logo principal
-    ├── mafiaIcon.png      # Icono para modo disponible
-    ├── iconHaunt.png      # Icono para modo reservado
-    └── [otros iconos...]
-```
-
-## 🔧 Funcionalidades Técnicas
-
-### Detección de Productos
-- Utiliza selectores específicos de Wallapop: `.item-card_ItemCard--vertical__CNrfk`
-- Fallback a selectores genéricos para mayor compatibilidad
-- Observer para detectar productos cargados dinámicamente
-
-### Detección de Estado de Reserva
-- Busca elementos `wallapop-badge[badge-type="reserved"]`
-- Verifica atributos de texto para "Reservado" o "Reserved"
-- Sistema robusto que se adapta a cambios en la estructura de Wallapop
-
-### Gestión de Estado
-- Almacenamiento local con Chrome Storage API
-- Persistencia de preferencias entre sesiones
-- Comunicación bidireccional entre popup y content script
-
-## 🎨 Características de UI/UX
-
-### Sidebar Lateral
-- Diseño moderno con gradientes
-- Animaciones suaves de entrada/salida
-- Responsive y optimizado para diferentes resoluciones
-
-### Iconos Dinámicos
-- Cambian según el filtro activo:
-  - 🎯 Logo normal para "Todos"
-  - 👔 Mafia icon para "Disponibles"
-  - 👻 Haunt icon para "Reservados"
-
-### Feedback Visual
-- Estadísticas en tiempo real
-- Notificaciones de estado
-- Indicadores de carga
-
-## 🐛 Debugging y Desarrollo
-
-### Logs de Consola
-La extensión incluye logging detallado para facilitar el debugging:
-```javascript
-console.log('🚀 Reserve Sniper iniciado');
-console.log('🔍 Encontrados X resultados de búsqueda');
-console.log('📊 Filtro aplicado: X visibles, Y ocultos');
-```
-
-## 🤝 Contribuir
-
-¡Las contribuciones son bienvenidas! Si quieres mejorar la extensión:
-
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
-
-### Ideas para Contribuir
-- Mejoras en la detección de productos
-- Nuevos filtros (precio, ubicación, etc.)
-- Optimizaciones de rendimiento
-- Mejoras en la UI/UX
-- Soporte para otros sitios de segunda mano
-
-## 📄 Licencia
-
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
-
-## ☕ Apoyo
-
-Si te gusta esta extensión y quieres apoyar el desarrollo:
-
-[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-yellow.svg)](https://buymeacoffee.com/martingodeg)
-
-## 🐛 Reportar Bugs
-
-Si encuentras algún bug o tienes sugerencias:
-
-1. Ve a la sección [Issues](https://github.com/MartinGoDev/Reserve-Sniper-Extension/issues)
-2. Crea un nuevo issue
-3. Describe el problema detalladamente
-4. Incluye pasos para reproducir el error
-
-## 📞 Contacto
-
-- **Desarrollador**: MartinGoDev
-- **GitHub**: [@MartinGoDev](https://github.com/MartinGoDev)
-- **Linkedin**: [Martin Gonzalez](https://www.linkedin.com/in/martin-gonzalez-fernandez-258559142/)
-- **Buy Me a Coffee**: [martingodeg](https://buymeacoffee.com/martingodeg)
-
+<p align="center">
+  <img src="docs/screenshot-light.png" alt="Panel de MarketLens en modo claro" width="49%">
+  <img src="docs/screenshot-dark.png" alt="Panel de MarketLens en modo oscuro" width="49%">
+</p>
+<p align="center"><sub>Capturas generadas por los tests sobre una página que imita a Wallapop.</sub></p>
 
 ---
 
-**¡Disfruta cazando las mejores ofertas en Wallapop con Reserve Sniper! 🎯**
+## Índice
+
+- [Características](#características)
+- [Instalación](#instalación)
+- [Uso](#uso)
+- [Cómo funciona](#cómo-funciona)
+- [Desarrollo](#desarrollo)
+- [Tests e integración continua](#tests-e-integración-continua)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Contribuir](#contribuir)
+- [Créditos](#créditos)
+
+## Características
+
+| | Función | Qué hace |
+|---|---|---|
+| 🔎 | **Filtro de reservas** | Muestra todos los anuncios, solo los disponibles o solo los reservados. Se aplica también a los que se cargan al hacer scroll. |
+| 📈 | **Análisis de precios** | Calcula el precio medio y el rango de la búsqueda, y marca en cada anuncio cuánto está por encima (rojo) o por debajo (verde) de la media. |
+| 🚫 | **Bloqueo de vendedores** | Muestra el ID del vendedor en cada anuncio (clic para copiarlo) y permite ocultar todos sus anuncios de una vez. |
+| ✕ | **Ocultar anuncios sueltos** | Quita de la página un anuncio concreto y recalcula la media sin él. |
+| 🌗 | **Modo claro y oscuro** | El panel sigue la apariencia del sistema. |
+| 💾 | **Preferencias guardadas** | El filtro elegido y el estado del interruptor se recuerdan entre sesiones. |
+
+## Instalación
+
+> MarketLens todavía no está en la Chrome Web Store; se instala en modo desarrollador.
+
+**Desde el código**
+
+```bash
+git clone https://github.com/dierodfer/MarketLens.git
+```
+
+**Desde CI**: cada ejecución en verde de [GitHub Actions](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml) publica el artefacto `marketlens-extension`, un `.zip` listo para descomprimir.
+
+Después:
+
+1. Abre `chrome://extensions/`.
+2. Activa el **Modo de desarrollador** (arriba a la derecha).
+3. Pulsa **Cargar descomprimida** y elige la carpeta del proyecto.
+
+Probada en Chrome; debería funcionar en otros navegadores basados en Chromium (Edge, Brave…).
+
+## Uso
+
+1. Haz una búsqueda en [es.wallapop.com](https://es.wallapop.com).
+2. Pulsa la pestaña de MarketLens en el borde derecho de la pantalla.
+3. En **Mostrar**, elige **Todos**, **Disponibles** o **Reservados**.
+
+| Elemento | Dónde | Para qué |
+|---|---|---|
+| Pestaña lateral | Borde derecho | Abre el panel. El punto indica el estado: verde activo, gris en pausa. |
+| Filtrado automático | Panel | Pausa el filtro sin perder la selección. |
+| Pastilla de precio | Junto al precio de cada anuncio | Diferencia respecto a la media. |
+| Chip del vendedor | Bajo el título | Clic para copiar su ID; **Bloquear** oculta todos sus anuncios. |
+| Precio medio | Esquina inferior izquierda | Media y número de anuncios analizados. |
+| Icono de la barra | Barra de Chrome | Estado de la conexión con la pestaña de Wallapop. |
+
+## Cómo funciona
+
+```
+Wallapop ──fetch /api/v3/search──▶ inject.js ──postMessage──▶ content.js ──▶ panel, filtros y precios
+                                   (contexto de la página)     (content script)
+```
+
+- **Productos**: se detectan con `.item-card_ItemCard--vertical__CNrfk` y, como respaldo, `a[href*="/item/"]`. Un `MutationObserver` aplica el filtro a los que se cargan después.
+- **Reservas**: un anuncio está reservado si contiene `wallapop-badge[badge-type="reserved"]` o una insignia con el texto "Reservado".
+- **Vendedores**: `inject.js` lee las respuestas de la API de búsqueda y `content.js` empareja cada anuncio con su vendedor por la URL de la imagen.
+- **Preferencias**: se guardan con `chrome.storage.local`.
+
+La extensión solo se ejecuta en `es.wallapop.com` y `www.wallapop.com` y no envía datos a ningún servidor.
+
+## Desarrollo
+
+Requisitos: **Node.js 24** (ver [`.nvmrc`](.nvmrc); funciona desde la 22) y npm.
+
+```bash
+npm install
+npx playwright install chromium --no-shell   # solo la primera vez
+```
+
+| Comando | Qué hace |
+|---|---|
+| `npm run lint` | Comprueba la sintaxis de todos los scripts de la extensión. |
+| `npm run test:unit` | Valida el manifest, los iconos y los ficheros referenciados. |
+| `npm run test:e2e` | Carga la extensión en Chromium y la prueba sobre Wallapop simulado. |
+| `npm test` | Todo lo anterior. |
+
+Para depurar en una página real de Wallapop:
+
+- `Alt+Shift+D`: resumen de disponibles y reservados en la consola.
+- `testReservedFilter()` y `showAllProducts()` desde la consola de la página.
+
+## Tests e integración continua
+
+Los tests E2E usan [Playwright](https://playwright.dev) con la extensión cargada de verdad en Chromium. Wallapop, su API y las imágenes se sirven en local desde [`tests/fixtures/search.html`](tests/fixtures/search.html), así que los tests no dependen de la red ni de los cambios de la web real.
+
+Qué se comprueba:
+
+- El panel se inyecta una sola vez, se abre y se cierra, y no se duplica al navegar.
+- Los filtros muestran los anuncios correctos y la preferencia sobrevive a una recarga.
+- La media, el rango y las diferencias de precio son correctos y se recalculan al cargar más anuncios.
+- Cada anuncio muestra su vendedor según la API; bloquearlo oculta sus anuncios y actualiza la media.
+- Los diálogos son propios de la extensión, nunca `confirm()` del navegador.
+- La página no lanza errores de JavaScript.
+
+El workflow [`ci.yml`](.github/workflows/ci.yml) se ejecuta **solo en pull requests contra `master`** (y a mano desde la pestaña Actions). No se lanza en los push a `master` ni cuando la PR solo toca documentación (`*.md`, `docs/`).
+
+Un único job ordenado de lo más barato a lo más caro, para fallar cuanto antes:
+
+1. Sintaxis (`npm run lint`) y tests unitarios (`npm run test:unit`): no necesitan dependencias.
+2. `npm ci` e instalación de Chromium (sin headless shell ni paquetes del sistema).
+3. Tests E2E (`npm run test:e2e`). Si fallan, sube el informe de Playwright como artefacto `playwright-report`.
+4. Si todo pasa, publica la extensión como artefacto `marketlens-extension`.
+
+Otras decisiones:
+
+- **Concurrencia**: un push nuevo a la misma PR cancela la ejecución anterior que siga en curso.
+- **Seguridad**: permisos de solo lectura, actions fijadas por SHA y checkout sin credenciales persistidas.
+- **Actualizaciones**: [Dependabot](.github/dependabot.yml) propone cada semana las nuevas versiones de las actions y de Playwright.
+
+Para usar un Chromium ya instalado en lugar del de Playwright: `CHROMIUM_PATH=/ruta/a/chromium npm run test:e2e`. Tiene que ser Chromium: Google Chrome no permite cargar extensiones desde la línea de comandos.
+
+> Los tests no pueden detectar que Wallapop cambie su HTML o su API. Si la extensión deja de encontrar productos, revisa primero los selectores de `getSearchResults()` en `content.js`.
+
+## Estructura del proyecto
+
+```
+MarketLens/
+├── manifest.json            # Configuración de la extensión (Manifest V3)
+├── content.js               # Panel, filtro, análisis de precios y bloqueo
+├── inject.js                # Lee las respuestas de la API de búsqueda
+├── background.js            # Service worker
+├── styles.css               # Estilos del panel y de los elementos sobre las tarjetas
+├── popup.html · popup.js    # Popup del icono de la extensión
+├── icons/                   # Icono (SVG fuente y PNG 16/32/48/128)
+├── docs/                    # Capturas del README
+├── tests/
+│   ├── unit/                # Tests del manifest (node:test)
+│   ├── e2e/                 # Tests de Playwright y su fixture
+│   └── fixtures/            # Página de búsqueda simulada
+├── scripts/check-syntax.mjs
+├── playwright.config.js
+├── .nvmrc                   # Versión de Node.js
+└── .github/
+    ├── workflows/ci.yml     # CI en pull requests
+    └── dependabot.yml       # Actualización semanal de actions y Playwright
+```
+
+## Contribuir
+
+1. Haz un fork y crea una rama: `git checkout -b mi-mejora`.
+2. Haz tus cambios y ejecuta `npm test`.
+3. Abre un pull request; la CI tiene que quedar en verde.
+
+¿Has encontrado un fallo? Abre un [issue](https://github.com/dierodfer/MarketLens/issues) con los pasos para reproducirlo y, si puedes, la URL de la búsqueda.
+
+## Créditos
+
+Basado en [Reserve Sniper](https://github.com/MartinGoDev/Reserve-Sniper-Extension) de [MartinGoDev](https://github.com/MartinGoDev).
+
+Si te resulta útil, puedes apoyar al autor original:
+
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/martingodeg)

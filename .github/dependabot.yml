@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Mantiene al día las actions (fijadas por SHA) del workflow de CI
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  # Mantiene al día Playwright
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      playwright:
+        patterns: ['@playwright/*', 'playwright*']
