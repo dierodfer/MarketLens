@@ -19,7 +19,11 @@
   <img src="docs/screenshot-light.png" alt="Panel de MarketLens en modo claro" width="49%">
   <img src="docs/screenshot-dark.png" alt="Panel de MarketLens en modo oscuro" width="49%">
 </p>
-<p align="center"><sub>Capturas generadas por los tests sobre una página que imita a Wallapop.</sub></p>
+<p align="center">
+  <img src="docs/settings-light.png" alt="Sección de configuración del panel" width="49%">
+  <img src="docs/settings-dark.png" alt="Sección de configuración del panel en modo oscuro" width="49%">
+</p>
+<p align="center"><sub>Capturas generadas por los tests sobre una página que imita a Wallapop. Abajo, la configuración con «Ocultar anuncios» desactivado.</sub></p>
 
 ---
 
@@ -43,8 +47,10 @@
 | 📈 | **Análisis de precios** | Calcula el precio medio y el rango de la búsqueda, y marca en cada anuncio cuánto está por encima (rojo) o por debajo (verde) de la media. |
 | 🚫 | **Bloqueo de vendedores** | Muestra el ID del vendedor en cada anuncio (clic para copiarlo) y permite ocultar todos sus anuncios de una vez. |
 | ✕ | **Ocultar anuncios sueltos** | Quita de la página un anuncio concreto y recalcula la media sin él. |
+| 👁 | **Marcar como visto** | Cubre el anuncio con un velo gris sin quitarlo de la página. La marca se guarda: sigue ahí al recargar o repetir la búsqueda. |
 | 🌗 | **Modo claro y oscuro** | El panel sigue la apariencia del sistema. |
-| 💾 | **Preferencias guardadas** | El filtro elegido y el estado del interruptor se recuerdan entre sesiones. |
+| ⚙️ | **Configuración por usuario** | Cada función se activa o desactiva desde el panel (ver más abajo). |
+| 💾 | **Preferencias guardadas** | El filtro elegido, la configuración y los anuncios vistos se recuerdan entre sesiones. |
 
 ## Instalación
 
@@ -71,15 +77,33 @@ Probada en Chrome; debería funcionar en otros navegadores basados en Chromium (
 1. Haz una búsqueda en [es.wallapop.com](https://es.wallapop.com).
 2. Pulsa la pestaña de MarketLens en el borde derecho de la pantalla.
 3. En **Mostrar**, elige **Todos**, **Disponibles** o **Reservados**.
+4. En **Configuración** activa o desactiva las funciones que quieras.
 
 | Elemento | Dónde | Para qué |
 |---|---|---|
 | Pestaña lateral | Borde derecho | Abre el panel. El punto indica el estado: verde activo, gris en pausa. |
-| Filtrado automático | Panel | Pausa el filtro sin perder la selección. |
+| Configuración | Panel, sección plegable | Interruptor por función; el del filtro lo pausa sin perder la selección. |
 | Pastilla de precio | Junto al precio de cada anuncio | Diferencia respecto a la media. |
+| Botón del ojo | Esquina superior derecha de cada anuncio | Marca o desmarca el anuncio como visto (velo gris). Se puede deshacer pulsando de nuevo. |
 | Chip del vendedor | Bajo el título | Clic para copiar su ID; **Bloquear** oculta todos sus anuncios. |
+| Vistos | Panel | Cuántos anuncios vistos hay en la página y **Borrar** para quitar todas las marcas. |
 | Precio medio | Esquina inferior izquierda | Media y número de anuncios analizados. |
 | Icono de la barra | Barra de Chrome | Estado de la conexión con la pestaña de Wallapop. |
+
+## Configuración
+
+El panel tiene una sección plegable **Configuración** con un interruptor por función. Todas vienen activadas y cada usuario elige las suyas; se guardan en el navegador (`chrome.storage.local`).
+
+| Interruptor | Qué cambia al desactivarlo |
+|---|---|
+| **Filtro de reservas** | Se muestran todos los anuncios. Elegir un modo en **Mostrar** lo vuelve a activar. |
+| **Análisis de precios** | Desaparecen la tarjeta de precio medio, las pastillas de diferencia y las filas de precio medio y rango del panel. |
+| **Vendedor de cada anuncio** | Desaparece el ID del vendedor (y, con él, el botón de bloquear). |
+| **Bloquear vendedores** | Desaparece el botón **Bloquear** y la fila de bloqueados. Requiere que el vendedor se muestre. |
+| **Ocultar anuncios** | Desaparece la × de cada tarjeta. |
+| **Marcar como visto** | Desaparecen el ojo, el velo gris y la fila **Vistos**. Las marcas ya hechas se conservan y vuelven al reactivarla. |
+
+Desactivar una función no deshace lo ya hecho: los anuncios que ocultaste o los vendedores que bloqueaste no vuelven hasta recargar la página.
 
 ## Cómo funciona
 
@@ -126,6 +150,8 @@ Qué se comprueba:
 - Los filtros muestran los anuncios correctos y la preferencia sobrevive a una recarga.
 - La media, el rango y las diferencias de precio son correctos y se recalculan al cargar más anuncios.
 - Cada anuncio muestra su vendedor según la API; bloquearlo oculta sus anuncios y actualiza la media.
+- Cada interruptor de la configuración activa o desactiva su función y se recuerda tras recargar.
+- Marcar como visto aplica el velo, no oculta ni cambia la media, respeta el filtro, sobrevive a una recarga y se puede borrar desde el panel.
 - Los diálogos son propios de la extensión, nunca `confirm()` del navegador.
 - La página no lanza errores de JavaScript.
 

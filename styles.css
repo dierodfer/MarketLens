@@ -247,6 +247,64 @@
 }
 
 /* Control segmentado */
+/* Configuración plegable */
+.ml-settings__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.ml-settings__summary::-webkit-details-marker {
+  display: none;
+}
+
+.ml-settings__summary::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--ml-text-2);
+  border-bottom: 2px solid var(--ml-text-2);
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+}
+
+.ml-settings[open] > .ml-settings__summary::after {
+  transform: rotate(-135deg);
+}
+
+.ml-settings__body {
+  border-top: 1px solid var(--ml-separator);
+}
+
+.ml-settings__body .ml-toggle-row + .ml-toggle-row {
+  border-top: 1px solid var(--ml-separator);
+}
+
+.ml-switch input:disabled + .ml-switch__track {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Funciones desactivadas: ml-off-<clave> en <html> oculta sus elementos */
+html.ml-off-prices #wallapop-average-price-display,
+html.ml-off-prices .wallapop-price-indicator,
+html.ml-off-prices .ml-row-prices,
+html.ml-off-sellers .wallapop-user-id-container,
+html.ml-off-blocking .wallapop-delete-user-btn,
+html.ml-off-blocking .ml-row-blocking,
+html.ml-off-hide .wallapop-delete-ad-btn,
+html.ml-off-seen .ml-seen-btn,
+html.ml-off-seen .ml-seen-veil,
+html.ml-off-seen .ml-row-seen {
+  display: none !important;
+}
+
 .ml-section-label {
   font-size: 12px;
   font-weight: 600;
@@ -337,6 +395,29 @@
 .ml-list__value--strong {
   color: var(--ml-text);
   font-weight: 600;
+}
+
+.ml-list__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ml-text-btn {
+  border: none;
+  background: transparent;
+  color: var(--ml-link);
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 32px;
+  padding: 0 0 0 8px;
+  cursor: pointer;
+}
+
+.ml-text-btn:disabled {
+  color: var(--ml-text-2);
+  opacity: 0.5;
+  cursor: default;
 }
 
 .ml-spacer {
@@ -496,7 +577,8 @@
   color: #b42318 !important;
 }
 
-.wallapop-delete-ad-btn {
+.wallapop-delete-ad-btn,
+.ml-seen-btn {
   position: absolute !important;
   top: 2px !important;
   right: 2px !important;
@@ -512,7 +594,12 @@
   justify-content: center !important;
 }
 
-.wallapop-delete-ad-btn .ml-hide-circle {
+.ml-seen-btn {
+  right: 46px !important;
+}
+
+.wallapop-delete-ad-btn .ml-hide-circle,
+.ml-seen-btn .ml-hide-circle {
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -527,8 +614,24 @@
   transition: transform 0.15s ease;
 }
 
-.wallapop-delete-ad-btn:hover .ml-hide-circle {
+.wallapop-delete-ad-btn:hover .ml-hide-circle,
+.ml-seen-btn:hover .ml-hide-circle {
   transform: scale(1.08);
+}
+
+/* Anuncio visto: el botón queda marcado y un velo gris cubre la tarjeta */
+.ml-seen-btn[aria-pressed="true"] .ml-hide-circle {
+  background: #0071e3;
+  color: #ffffff;
+}
+
+.ml-seen-veil {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+  border-radius: inherit;
+  background: rgba(110, 110, 115, 0.58) !important;
+  pointer-events: none !important;
 }
 
 .wallapop-user-id-container {

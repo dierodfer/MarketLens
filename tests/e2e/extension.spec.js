@@ -1,5 +1,18 @@
 const { test, expect, card, visibleIds, SEARCH_URL } = require('./fixtures');
 
+// Abre el panel y despliega la configuración
+async function openSettings(page) {
+  await page.locator('#ml-tab').click();
+  const settings = page.locator('#ml-settings');
+  if (!(await settings.evaluate((element) => element.open))) {
+    await settings.locator('summary').click();
+  }
+}
+
+// El interruptor real está oculto: se pulsa su etiqueta
+const featureSwitch = (page, key) => page.locator(`label.ml-switch:has(input[data-feature="${key}"])`);
+const featureInput = (page, key) => page.locator(`input[data-feature="${key}"]`);
+
 test.describe('Panel lateral', () => {
   test('se inyecta una sola vez y se abre desde la pestaña', async ({ search: page }) => {
     await expect(page.locator('#ml-sidebar')).toHaveCount(1);
@@ -50,10 +63,10 @@ test.describe('Filtro de reservas', () => {
   });
 
   test('el interruptor pausa el filtro y lo recuerda al recargar', async ({ search: page }) => {
-    await page.locator('#ml-tab').click();
+    await openSettings(page);
     await page.getByRole('button', { name: 'Reservados', exact: true }).click();
 
-    await page.locator('.ml-switch').click();
+    await featureSwitch(page, 'filter').click();
     await expect(page.locator('#extension-toggle')).not.toBeChecked();
     expect(await visibleIds(page)).toEqual(['a1', 'a2', 'a3', 'a4']);
     await expect(page.locator('#ml-tab-dot')).not.toHaveClass(/ml-on/);
@@ -152,6 +165,198 @@ test.describe('Bloqueo de vendedores', () => {
   });
 });
 
+test.describe('Marcar como visto', () => {
+  const seenButton = (page, id) => card(page, id).getByRole('button', { name: /visto/ });
+
+  test('marca el anuncio con un velo gris por encima y se puede deshacer', async ({ search: page }) => {
+    await expect(card(page, 'a1').locator('.ml-seen-veil')).toHaveCount(0);
+
+    await seenButton(page, 'a1').click();
+    await expect(card(page, 'a1')).toHaveClass(/ml-seen/);
+    await expect(seenButton(page, 'a1')).toHaveAttribute('aria-pressed', 'true');
+    await expect(seenButton(page, 'a1')).toHaveAccessibleName('Quitar marca de visto');
+
+    // Velo gris semitransparente que cubre toda la tarjeta y no bloquea los clics
+    const veil = card(page, 'a1').locator('.ml-seen-veil');
+    await expect(veil).toHaveCount(1);
+    await expect(veil).toHaveCSS('background-color', /^rgba\(110, 110, 115, 0\.\d+\)$/);
+    await expect(veil).toHaveCSS('pointer-events', 'none');
+    const [cardBox, veilBox] = await Promise.all([card(page, 'a1').boundingBox(), veil.boundingBox()]);
+    expect(veilBox).toEqual(cardBox);
+
+    // Las demás tarjetas no cambian
+    await expect(card(page, 'a2')).not.toHaveClass(/ml-seen/);
+
+    // Volver a pulsar quita la marca
+    await seenButton(page, 'a1').click();
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-seen/);
+    await expect(card(page, 'a1').locator('.ml-seen-veil')).toHaveCount(0);
+    await expect(seenButton(page, 'a1')).toHaveAccessibleName('Marcar como visto');
+  });
+
+  test('a diferencia de ocultar, el anuncio sigue en la página y respeta el filtro', async ({ search: page }) => {
+    await seenButton(page, 'a2').click();
+    await expect(card(page, 'a2')).toHaveCount(1);
+
+    await page.locator('#ml-tab').click();
+    await page.getByRole('button', { name: 'Reservados', exact: true }).click();
+    expect(await visibleIds(page)).toEqual(['a2', 'a4']);
+    await expect(card(page, 'a2')).toHaveClass(/ml-seen/);
+  });
+
+  test('las marcas sobreviven a una recarga', async ({ search: page }) => {
+    await seenButton(page, 'a3').click();
+    await seenButton(page, 'a4').click();
+
+    await page.reload();
+    await expect(card(page, 'a3')).toHaveClass(/ml-seen/, { timeout: 10_000 });
+    await expect(card(page, 'a4')).toHaveClass(/ml-seen/);
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-seen/);
+  });
+
+  test('el panel cuenta los vistos y permite borrarlos todos', async ({ search: page }) => {
+    await page.locator('#ml-tab').click();
+    await expect(page.locator('#ml-seen-count')).toHaveText('0 en esta página');
+    await expect(page.locator('#ml-clear-seen')).toBeDisabled();
+
+    await seenButton(page, 'a1').click();
+    await seenButton(page, 'a2').click();
+    await expect(page.locator('#ml-seen-count')).toHaveText('2 en esta página');
+    await expect(page.locator('#ml-clear-seen')).toBeEnabled();
+
+    await page.locator('#ml-clear-seen').click();
+    const dialog = page.getByRole('alertdialog');
+    await expect(dialog).toContainText('Se quitará la marca de 2 anuncios');
+
+    // Cancelar no borra nada
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(page.locator('.ml-seen-veil')).toHaveCount(2);
+
+    await page.locator('#ml-clear-seen').click();
+    await dialog.getByRole('button', { name: 'Borrar' }).click();
+    await expect(page.locator('.ml-seen-veil')).toHaveCount(0);
+    await expect(page.locator('#ml-seen-count')).toHaveText('0 en esta página');
+    await expect(page.locator('#ml-clear-seen')).toBeDisabled();
+  });
+
+  test('marcar uno como visto no cambia la media de precios', async ({ search: page }) => {
+    await seenButton(page, 'a4').click();
+    await expect(page.locator('#wallapop-average-price-display')).toContainText('225 €');
+    await expect(page.locator('#wallapop-average-price-display')).toContainText('4 anuncios');
+  });
+});
+
+test.describe('Configuración', () => {
+  test('hay un interruptor por función, todos activos de serie', async ({ search: page }) => {
+    await openSettings(page);
+    for (const key of ['filter', 'prices', 'sellers', 'blocking', 'hide', 'seen']) {
+      await expect(featureInput(page, key)).toBeChecked();
+    }
+    await expect(page.locator('#ml-settings input[data-feature]')).toHaveCount(6);
+  });
+
+  test('análisis de precios', async ({ search: page }) => {
+    await expect(card(page, 'a1').locator('.wallapop-price-indicator')).toBeVisible();
+    await openSettings(page);
+    await expect(page.locator('#ml-avg-price')).toBeVisible();
+
+    await featureSwitch(page, 'prices').click();
+    await expect(page.locator('.wallapop-price-indicator').first()).toBeHidden();
+    await expect(page.locator('#wallapop-average-price-display')).toBeHidden();
+    await expect(page.locator('#ml-avg-price')).toBeHidden();
+    await expect(page.locator('#ml-price-range')).toBeHidden();
+
+    await featureSwitch(page, 'prices').click();
+    await expect(card(page, 'a1').locator('.wallapop-price-indicator')).toBeVisible();
+    await expect(page.locator('#wallapop-average-price-display')).toBeVisible();
+  });
+
+  test('vendedor de cada anuncio; sin él no se puede bloquear', async ({ search: page }) => {
+    await openSettings(page);
+    await expect(featureInput(page, 'blocking')).toBeEnabled();
+
+    await featureSwitch(page, 'sellers').click();
+    await expect(card(page, 'a1').locator('.wallapop-user-id-container')).toBeHidden();
+    await expect(featureInput(page, 'blocking')).toBeDisabled();
+
+    await featureSwitch(page, 'sellers').click();
+    await expect(card(page, 'a1').locator('.wallapop-user-id-display')).toBeVisible();
+    await expect(featureInput(page, 'blocking')).toBeEnabled();
+  });
+
+  test('bloquear vendedores', async ({ search: page }) => {
+    await openSettings(page);
+    await featureSwitch(page, 'blocking').click();
+
+    await expect(card(page, 'a1').getByRole('button', { name: 'Bloquear' })).toBeHidden();
+    // El ID sigue visible: solo se quita la acción
+    await expect(card(page, 'a1').locator('.wallapop-user-id-display')).toBeVisible();
+    await expect(page.locator('#ml-blocked')).toBeHidden();
+
+    await featureSwitch(page, 'blocking').click();
+    await expect(card(page, 'a1').getByRole('button', { name: 'Bloquear' })).toBeVisible();
+  });
+
+  test('ocultar anuncios', async ({ search: page }) => {
+    const hideButton = card(page, 'a1').getByRole('button', { name: /Ocultar este anuncio/ });
+    await expect(hideButton).toBeVisible();
+    await openSettings(page);
+
+    await featureSwitch(page, 'hide').click();
+    await expect(hideButton).toBeHidden();
+    // El resto de botones de la tarjeta no se ven afectados
+    await expect(card(page, 'a1').getByRole('button', { name: /visto/ })).toBeVisible();
+
+    await featureSwitch(page, 'hide').click();
+    await expect(hideButton).toBeVisible();
+  });
+
+  test('marcar como visto oculta botón, velo y fila, y conserva las marcas', async ({ search: page }) => {
+    const seenButton = card(page, 'a1').getByRole('button', { name: /visto/ });
+    await seenButton.click();
+    await expect(card(page, 'a1').locator('.ml-seen-veil')).toBeVisible();
+    await openSettings(page);
+
+    await featureSwitch(page, 'seen').click();
+    await expect(seenButton).toBeHidden();
+    await expect(card(page, 'a1').locator('.ml-seen-veil')).toBeHidden();
+    await expect(page.locator('#ml-seen-count')).toBeHidden();
+
+    // Al reactivarla la marca sigue ahí
+    await featureSwitch(page, 'seen').click();
+    await expect(card(page, 'a1').locator('.ml-seen-veil')).toBeVisible();
+    await expect(page.locator('#ml-seen-count')).toHaveText('1 en esta página');
+  });
+
+  test('la configuración se guarda por usuario y sobrevive a una recarga', async ({ search: page }) => {
+    await openSettings(page);
+    await featureSwitch(page, 'prices').click();
+    await featureSwitch(page, 'hide').click();
+
+    await page.reload();
+    await expect(page.locator('#ml-tab')).toBeVisible();
+    await expect(page.locator('.wallapop-user-id-container').first()).toBeVisible({ timeout: 15_000 });
+
+    await expect(page.locator('html')).toHaveClass(/ml-off-prices/);
+    await expect(page.locator('html')).toHaveClass(/ml-off-hide/);
+    await expect(page.locator('html')).not.toHaveClass(/ml-off-seen/);
+    await expect(page.locator('.wallapop-price-indicator').first()).toBeHidden();
+    await expect(card(page, 'a1').getByRole('button', { name: /Ocultar este anuncio/ })).toBeHidden();
+
+    await openSettings(page);
+    await expect(featureInput(page, 'prices')).not.toBeChecked();
+    await expect(featureInput(page, 'hide')).not.toBeChecked();
+    await expect(featureInput(page, 'sellers')).toBeChecked();
+  });
+
+  test('el desplegable de configuración es accesible por teclado', async ({ search: page }) => {
+    await page.locator('#ml-tab').click();
+    await page.locator('#ml-settings summary').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#ml-settings')).toHaveJSProperty('open', true);
+  });
+});
+
 test.describe('Popup', () => {
   test('muestra nombre y versión', async ({ context, extensionId }) => {
     const popup = await context.newPage();
@@ -170,11 +375,21 @@ test.describe('Capturas', () => {
       test.use({ colorScheme: scheme });
 
       test(`panel abierto (${scheme})`, async ({ search: page }, testInfo) => {
+        await card(page, 'a1').getByRole('button', { name: 'Marcar como visto' }).click();
         await page.locator('#ml-tab').click();
         await page.getByRole('button', { name: 'Disponibles', exact: true }).click();
         await page.waitForTimeout(400);
         await page.screenshot({ path: testInfo.outputPath(`panel-${scheme}.png`) });
         expect(page.url()).toBe(SEARCH_URL);
+      });
+
+      test(`configuración (${scheme})`, async ({ search: page }, testInfo) => {
+        await page.locator('.wallapop-price-indicator').first().waitFor();
+        await openSettings(page);
+        await featureSwitch(page, 'hide').click();
+        await page.locator('#ml-settings').scrollIntoViewIfNeeded();
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: testInfo.outputPath(`settings-${scheme}.png`) });
       });
     });
   }
