@@ -7,8 +7,19 @@ const ML_FEATURES = [
   { key: 'prices', title: 'Análisis de precios', description: 'Media, rango y diferencia en cada anuncio' },
   { key: 'sellers', title: 'Vendedor de cada anuncio', description: 'Muestra su ID y permite copiarlo' },
   { key: 'blocking', title: 'Bloquear vendedores', description: 'Oculta todos los anuncios de un vendedor' },
-  { key: 'hide', title: 'Ocultar anuncios', description: 'Botón × para quitar un anuncio' },
-  { key: 'seen', title: 'Marcar como visto', description: 'Velo gris en los anuncios ya revisados' }
+  { key: 'hide', title: 'Ocultar anuncios', description: 'La × oculta y el ojo lo recupera' }
+];
+
+// Tarjeta de un anuncio: la del perfil de un vendedor es un <a>, la de la búsqueda un <article>
+const ML_CARD_SELECTOR = 'a.item-card_ItemCard--vertical__CNrfk, article[class*="ItemCard"]';
+
+// Precio dentro de una tarjeta, del selector más específico al más genérico
+const ML_PRICE_SELECTORS = [
+  'strong[class*="ItemCard__price"]',
+  '[class*="ItemCard__currentPrice"]',
+  '[aria-label="Current price"]',
+  'strong[aria-label="Item price"]',
+  '[class*="__price"]'
 ];
 
 // Iconos de línea (SVG inline, heredan el color del texto)
@@ -37,11 +48,11 @@ class WallapopFilter {
   PRICE_MAX = 100000;
 
   // Funciones activables (el filtro se guarda aparte, en extensionEnabled)
-  features = { prices: true, sellers: true, blocking: true, hide: true, seen: true };
+  features = { prices: true, sellers: true, blocking: true, hide: true };
 
-  // Anuncios marcados como vistos (ruta /item/...) y máximo que se recuerda
-  seenItems = new Set();
-  SEEN_MAX = 5000;
+  // Anuncios ocultados (ruta /item/...) y máximo que se recuerda
+  hiddenItems = new Set();
+  HIDDEN_MAX = 5000;
 
   // Flag para detectar si el contexto está invalidado
   contextInvalidated = false;
@@ -239,8 +250,9 @@ class WallapopFilter {
     // Quitar las clases de funciones desactivadas
     this.clearFeatureClasses();
     
-    // Quitar botones y velos de "visto": la instancia nueva los vuelve a crear
-    document.querySelectorAll('.ml-seen-btn, .ml-seen-veil').forEach((element) => element.remove());
+    // Quitar botones de ocultar y su estado: la instancia nueva los vuelve a crear
+    document.querySelectorAll('.wallapop-delete-ad-btn').forEach((element) => element.remove());
+    document.querySelectorAll('.ml-ad-hidden').forEach((element) => element.classList.remove('ml-ad-hidden'));
     
     // Remover sidebar del DOM
     if (this.filterIndicator) {
@@ -294,15 +306,19 @@ class WallapopFilter {
 
   async loadSettings() {
     try {
-      const result = await chrome.storage.local.get(['filterMode', 'extensionEnabled', 'features', 'seenItems']);
+      const result = await chrome.storage.local.get(['filterMode', 'extensionEnabled', 'features', 'hiddenItems', 'seenItems']);
       this.filterMode = result.filterMode || 'all';
       this.extensionEnabled = result.extensionEnabled !== undefined ? result.extensionEnabled : true;
       for (const key of Object.keys(this.features)) {
         if (typeof result.features?.[key] === 'boolean') this.features[key] = result.features[key];
       }
-      if (Array.isArray(result.seenItems)) {
-        this.seenItems = new Set(result.seenItems.filter((key) => typeof key === 'string'));
-        this.refreshSeenMarks();
+      if (Array.isArray(result.hiddenItems)) {
+        this.hiddenItems = new Set(result.hiddenItems.filter((key) => typeof key === 'string'));
+        this.refreshHiddenAds();
+      }
+      // La antigua función "visto" ya no existe: se borran sus marcas
+      if (result.seenItems !== undefined) {
+        chrome.storage.local.remove('seenItems').catch(() => {});
       }
       console.log(`📋 Configuración cargada - Filtro: ${this.filterMode}, Activa: ${this.extensionEnabled}`);
       
@@ -335,34 +351,29 @@ class WallapopFilter {
     setTimeout(checkResults, 1000);
   }
 
+  // Tarjetas de anuncio de la página (las más externas, por si hubiera anidadas)
   getSearchResults() {
-    // ✅ Usar el selector específico de Wallapop
-    const specificSelector = '.item-card_ItemCard--vertical__CNrfk';
-    let results = document.querySelectorAll(specificSelector);
-    
-    if (results.length > 0) {
-      console.log(`✅ Usando selector específico: ${specificSelector} (${results.length} elementos)`);
-      return results;
+    const cards = Array.from(document.querySelectorAll(ML_CARD_SELECTOR))
+      .filter((card) => !card.parentElement?.closest(ML_CARD_SELECTOR));
+    if (cards.length > 0) return cards;
+
+    // Fallback: enlaces a anuncios, si Wallapop cambia las clases
+    return Array.from(document.querySelectorAll('a[href*="/item/"]'));
+  }
+
+  // Tarjeta que contiene un elemento
+  getCard(element) {
+    let card = element.closest(ML_CARD_SELECTOR);
+    while (card?.parentElement?.closest(ML_CARD_SELECTOR)) {
+      card = card.parentElement.closest(ML_CARD_SELECTOR);
     }
-    
-    // Fallback
-    const fallbackSelector = 'a[href*="/item/"]';
-    results = document.querySelectorAll(fallbackSelector);
-    
-    if (results.length > 0) {
-      console.log(`✅ Usando selector fallback: ${fallbackSelector} (${results.length} elementos)`);
-    } else {
-      console.log('❌ No se encontraron productos');
-    }
-    
-    return results;
+    return card;
   }
 
   // Productos que aporta un nodo añadido al DOM: él mismo o sus descendientes
   findProductsIn(node) {
-    const selector = '.item-card_ItemCard--vertical__CNrfk';
-    if (node.matches?.(selector)) return [node];
-    return node.querySelectorAll?.(selector) ?? [];
+    if (node.matches?.(ML_CARD_SELECTOR)) return [node];
+    return node.querySelectorAll?.(ML_CARD_SELECTOR) ?? [];
   }
 
   setupObserver() {
@@ -476,37 +487,21 @@ class WallapopFilter {
 
   // ===== NUEVAS FUNCIONALIDADES DEL INJECTOR =====
 
-  // Buscador de precios robusto con múltiples selectores
-  findPriceElements(root = document) {
-    // 1) selector "bueno" si existe
-    const candidates = [
-      'strong[class*="ItemCard__price"]',
-      'strong[aria-label*="price" i]',
-      '[data-testid*="price" i]',
-      '[data-e2e*="price" i]',
-      '[class*="__price" i]',
-      '[class*="price" i]',
-      '[class*="Price" i]'
-    ];
-
-    for (const sel of candidates) {
-      const els = root.querySelectorAll(sel);
-      if (els.length) {
-        console.log(`💰 Encontrados ${els.length} elementos de precio con selector: ${sel}`);
-        return Array.from(els);
-      }
+  // Elemento con el precio de una tarjeta
+  findCardPrice(card) {
+    for (const selector of ML_PRICE_SELECTORS) {
+      const element = card.querySelector(selector);
+      if (element) return element;
     }
+    return null;
+  }
 
-    // 2) fallback por contenido "€" dentro de la card
-    const all = Array.from(root.querySelectorAll('strong, span, div, p'));
-    const withEuro = all.filter(el => el.textContent?.includes('€'));
-    if (withEuro.length) {
-      console.log(`💰 Encontrados ${withEuro.length} elementos de precio por contenido "€"`);
-      return withEuro;
-    }
-
-    console.log('⚠️ No se encontraron elementos de precio');
-    return [];
+  // Precios de los anuncios de la página, sin contar los ocultados
+  findPriceElements() {
+    return this.getSearchResults()
+      .filter((card) => !this.isAdHidden(card))
+      .map((card) => this.findCardPrice(card))
+      .filter(Boolean);
   }
 
   // Extraer precio de un elemento
@@ -540,29 +535,21 @@ class WallapopFilter {
     card.style.zIndex = '2';
   }
 
-  ensureDeleteButton(itemContainer, price) {
-    this.prepareCardContainer(itemContainer);
-
-    if (itemContainer.querySelector('.wallapop-delete-ad-btn')) return;
+  // Botón de la tarjeta: × para ocultar el anuncio; si está oculto, un ojo para mostrarlo
+  ensureHideButton(card) {
+    this.prepareCardContainer(card);
+    if (card.querySelector(':scope > .wallapop-delete-ad-btn')) return;
 
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'wallapop-delete-ad-btn';
-    btn.title = `Ocultar este anuncio (${this.formatPrice(price)})`;
-    btn.setAttribute('aria-label', btn.title);
-    btn.innerHTML = `<span class="ml-hide-circle">${ML_ICONS.close}</span>`;
-    btn.addEventListener('click', async (e) => {
+    btn.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-      const confirmed = await this.confirmDialog({
-        title: '¿Ocultar este anuncio?',
-        message: `Se quitará de esta página (${this.formatPrice(price)}).`,
-        confirmLabel: 'Ocultar'
-      });
-      if (confirmed) this.hideIndividualAd(itemContainer);
+      this.toggleAdHidden(card);
     });
 
-    itemContainer.appendChild(btn);
-    console.log(`✅ Botón de ocultar agregado para anuncio de ${price}€`);
+    card.appendChild(btn);
+    this.syncHiddenCard(card);
   }
 
   // Helper para insertar indicador de precio
@@ -623,6 +610,10 @@ class WallapopFilter {
     this.features[key] = enabled;
     this.applyFeatureClasses();
     this.syncSettingsUi();
+    if (key === 'hide') {
+      this.refreshHiddenAds();
+      this.recalculatePrices();
+    }
     this.saveSettings({ features: { ...this.features } });
     console.log(`⚙️ Función ${key}: ${enabled ? 'activada' : 'desactivada'}`);
   }
@@ -646,7 +637,7 @@ class WallapopFilter {
     setTimeout(() => this.updateFilterIndicator(), 100);
   }
 
-  // ===== MARCAR COMO VISTO =====
+  // ===== OCULTAR ANUNCIOS =====
 
   // Clave estable de un anuncio: la ruta de su enlace (/item/...)
   getItemKey(element) {
@@ -660,108 +651,113 @@ class WallapopFilter {
     }
   }
 
-  // Botón con un ojo: marca o desmarca el anuncio como visto
-  ensureSeenButton(itemContainer) {
-    this.prepareCardContainer(itemContainer);
-    if (itemContainer.querySelector(':scope > .ml-seen-btn')) return;
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ml-seen-btn';
-    btn.innerHTML = `<span class="ml-hide-circle">${ML_ICONS.eye}</span>`;
-    btn.addEventListener('click', (e) => {
-      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-      this.toggleSeen(itemContainer);
-    });
-
-    itemContainer.appendChild(btn);
-    this.syncSeenCard(itemContainer);
+  isAdHidden(card) {
+    if (!this.features.hide) return false;
+    const key = this.getItemKey(card);
+    return key !== null && this.hiddenItems.has(key);
   }
 
-  // Refleja en una tarjeta si está vista: velo gris por encima y estado del botón
-  syncSeenCard(card) {
-    const key = this.getItemKey(card);
-    const seen = key !== null && this.seenItems.has(key);
-    card.classList.toggle('ml-seen', seen);
+  // Refleja en una tarjeta si está oculta: contenido escondido y el botón pasa a ser un ojo
+  syncHiddenCard(card) {
+    const hidden = this.isAdHidden(card);
+    card.classList.toggle('ml-ad-hidden', hidden);
 
-    const veil = card.querySelector(':scope > .ml-seen-veil');
-    if (seen && !veil) {
-      this.prepareCardContainer(card);
-      const newVeil = document.createElement('span');
-      newVeil.className = 'ml-seen-veil';
-      newVeil.setAttribute('aria-hidden', 'true');
-      card.appendChild(newVeil);
-    } else if (!seen) {
-      veil?.remove();
-    }
-
-    const btn = card.querySelector(':scope > .ml-seen-btn');
-    if (btn) {
-      const label = seen ? 'Quitar marca de visto' : 'Marcar como visto';
+    const btn = card.querySelector(':scope > .wallapop-delete-ad-btn');
+    if (btn && btn.dataset.state !== String(hidden)) {
+      const price = this.extractPrice(this.findCardPrice(card));
+      const label = hidden
+        ? 'Mostrar anuncio'
+        : `Ocultar este anuncio${price ? ` (${this.formatPrice(price)})` : ''}`;
+      btn.dataset.state = String(hidden);
       btn.title = label;
       btn.setAttribute('aria-label', label);
-      btn.setAttribute('aria-pressed', String(seen));
+      btn.setAttribute('aria-pressed', String(hidden));
+      btn.innerHTML = `<span class="ml-hide-circle">${hidden ? ML_ICONS.eye : ML_ICONS.close}</span>`;
     }
-    return seen;
+    return hidden;
   }
 
-  // Actualiza todas las tarjetas y el contador del panel
-  refreshSeenMarks() {
-    let seenOnPage = 0;
+  // Botón en todas las tarjetas, estado de cada una y contador del panel
+  refreshHiddenAds() {
+    let hiddenOnPage = 0;
     this.getSearchResults().forEach((card) => {
-      if (this.syncSeenCard(card)) seenOnPage++;
+      this.ensureHideButton(card);
+      if (this.syncHiddenCard(card)) hiddenOnPage++;
     });
 
-    const count = this.filterIndicator?.querySelector('#ml-seen-count');
-    if (count) count.textContent = `${seenOnPage} en esta página`;
-    const clearButton = this.filterIndicator?.querySelector('#ml-clear-seen');
-    if (clearButton) clearButton.disabled = this.seenItems.size === 0;
+    const count = this.filterIndicator?.querySelector('#ml-hidden-count');
+    if (count) count.textContent = `${hiddenOnPage} en esta página`;
+    const showAll = this.filterIndicator?.querySelector('#ml-show-hidden');
+    if (showAll) showAll.disabled = this.hiddenItems.size === 0;
   }
 
-  toggleSeen(itemContainer) {
-    const key = this.getItemKey(itemContainer);
+  // Oculta o vuelve a mostrar un anuncio al momento, sin diálogo
+  toggleAdHidden(card) {
+    const key = this.getItemKey(card);
     if (key === null) return;
 
-    if (this.seenItems.has(key)) {
-      this.seenItems.delete(key);
+    if (this.hiddenItems.has(key)) {
+      this.hiddenItems.delete(key);
     } else {
-      this.seenItems.add(key);
-      // Al llegar al máximo se olvidan las marcas más antiguas
-      while (this.seenItems.size > this.SEEN_MAX) {
-        this.seenItems.delete(this.seenItems.values().next().value);
+      this.hiddenItems.add(key);
+      // Al llegar al máximo se olvidan los más antiguos
+      while (this.hiddenItems.size > this.HIDDEN_MAX) {
+        this.hiddenItems.delete(this.hiddenItems.values().next().value);
       }
     }
 
-    this.refreshSeenMarks();
-    this.saveSeenItems();
+    this.refreshHiddenAds();
+    this.saveHiddenItems();
+    this.recalculatePrices();
   }
 
-  saveSeenItems() {
-    const warn = (error) => console.warn('⚠️ No se pudieron guardar los vistos:', error.message);
+  saveHiddenItems() {
+    const warn = (error) => console.warn('⚠️ No se pudieron guardar los ocultos:', error.message);
     try {
-      chrome.storage.local.set({ seenItems: [...this.seenItems] }).catch(warn);
+      chrome.storage.local.set({ hiddenItems: [...this.hiddenItems] }).catch(warn);
     } catch (error) {
       warn(error);
     }
   }
 
-  async clearSeenItems() {
-    const total = this.seenItems.size;
+  // Vuelve a mostrar todos los anuncios ocultados, también los de otras búsquedas
+  async showAllHiddenAds() {
+    const total = this.hiddenItems.size;
     if (total === 0) return;
 
     const confirmed = await this.confirmDialog({
-      title: '¿Borrar todos los vistos?',
+      title: '¿Mostrar todos los ocultos?',
       message: total === 1
-        ? 'Se quitará la marca de 1 anuncio.'
-        : `Se quitará la marca de ${total} anuncios, también de otras búsquedas.`,
-      confirmLabel: 'Borrar'
+        ? 'Volverá a verse 1 anuncio.'
+        : `Volverán a verse ${total} anuncios, también los de otras búsquedas.`,
+      confirmLabel: 'Mostrar'
     });
     if (!confirmed) return;
 
-    this.seenItems.clear();
-    this.refreshSeenMarks();
-    this.saveSeenItems();
-    this.showNotification('Marcas de visto borradas');
+    this.hiddenItems.clear();
+    this.refreshHiddenAds();
+    this.saveHiddenItems();
+    this.recalculatePrices();
+  }
+
+  // Media y rango con los anuncios visibles (sin los ocultados ni los bloqueados)
+  recalculatePrices() {
+    if (!this.priceAnalysis.isComplete) return;
+
+    const prices = this.findPriceElements()
+      .map((element) => this.extractPrice(element))
+      .filter((price) => price && price <= this.PRICE_MAX);
+    this.priceAnalysis.allPrices = prices;
+
+    if (prices.length > 0) {
+      this.priceAnalysis.averagePrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+      this.showAveragePriceDisplay();
+      this.updateAllPriceIndicators();
+    } else {
+      this.priceAnalysis.averagePrice = 0;
+      document.getElementById('wallapop-average-price-display')?.remove();
+      this.updatePriceSummary();
+    }
   }
 
   // Pinta la diferencia de un precio respecto a la media
@@ -877,85 +873,29 @@ class WallapopFilter {
     }
   }
 
-  // Agregar indicadores de comparación de precios y botones de eliminar
+  // Agregar indicadores de comparación de precios y botones de ocultar
   addPriceButtons() {
-    console.log('🔍 Agregando indicadores de comparación de precios y botones de eliminar...');
-    
-    const priceElements = this.findPriceElements();
-    
     let indicatorsAdded = 0;
-    let deleteButtonsAdded = 0;
-    
-    priceElements.forEach((priceElement, index) => {
-      // Buscar el contenedor del item
-      const itemContainer = priceElement.closest('a[class*="ItemCard"]') || 
-                          priceElement.closest('div[class*="ItemCard"]') ||
-                          priceElement.closest('article') ||
-                          priceElement.parentNode;
-      
+
+    this.getSearchResults().forEach((card) => {
+      this.ensureHideButton(card);
+
+      const priceElement = this.findCardPrice(card);
       const price = this.extractPrice(priceElement);
-      
-      if (price && price > 0 && price <= this.PRICE_MAX) {
-        // 2) Botón de eliminar: SIEMPRE
-        if (itemContainer && !itemContainer.querySelector('.wallapop-delete-ad-btn')) {
-          this.ensureDeleteButton(itemContainer, price);
-          deleteButtonsAdded++;
-        }
+      if (!price || price > this.PRICE_MAX) return;
 
-        // Botón de "visto": en todas las tarjetas
-        if (itemContainer) this.ensureSeenButton(itemContainer);
-
-        // 1) Indicador: solo si ya hay media calculada
-        if (this.priceAnalysis.allPrices.length > 0 && !itemContainer.querySelector('.wallapop-price-indicator')) {
-          this.insertPriceIndicator(priceElement, price);
-          indicatorsAdded++;
-        }
+      // Indicador: solo si ya hay media calculada
+      if (this.priceAnalysis.allPrices.length > 0 && !card.querySelector('.wallapop-price-indicator')) {
+        this.insertPriceIndicator(priceElement, price);
+        indicatorsAdded++;
       }
     });
-    
-    console.log(`✅ ${indicatorsAdded} indicadores de precio y ${deleteButtonsAdded} botones de eliminar agregados`);
+
+    console.log(`✅ ${indicatorsAdded} indicadores de precio agregados`);
   }
 
-  // NOTA: Los botones de eliminar autor solo se crean con IDs reales de la API
+  // NOTA: Los botones de bloquear vendedor solo se crean con IDs reales de la API
   // a través de la función matchItemsWithHTML() - NO se generan IDs simulados
-
-  // Ocultar anuncio individual
-  hideIndividualAd(itemContainer) {
-    const priceElement = itemContainer.querySelector('strong[class*="ItemCard__price"], strong[aria-label="Item price"]');
-    let removedPrice = null;
-    
-    if (priceElement) {
-      removedPrice = this.extractPrice(priceElement);
-    }
-    
-    itemContainer.remove();
-    this.userBlocking.blockedAdsCount++;
-    
-    if (removedPrice && !Number.isNaN(removedPrice)) {
-      // Eliminar solo una ocurrencia del precio (no todas)
-      const index = this.priceAnalysis.allPrices.indexOf(removedPrice);
-      if (index > -1) {
-        this.priceAnalysis.allPrices.splice(index, 1);
-      }
-      
-      if (this.priceAnalysis.allPrices.length > 0) {
-        this.priceAnalysis.averagePrice = this.priceAnalysis.allPrices.reduce((sum, price) => sum + price, 0) / this.priceAnalysis.allPrices.length;
-        console.log(`📊 Nuevo precio promedio: ${this.priceAnalysis.averagePrice.toFixed(2)}€ (${this.priceAnalysis.allPrices.length} items restantes)`);
-        
-        this.updateAllPriceIndicators();
-        this.showAveragePriceDisplay();
-      } else {
-        const averagePriceDisplay = document.getElementById('wallapop-average-price-display');
-        if (averagePriceDisplay) {
-          averagePriceDisplay.remove();
-        }
-        this.updatePriceSummary();
-      }
-    }
-    
-    this.updateKpiStats();
-    this.showNotification(removedPrice ? `Anuncio de ${this.formatPrice(removedPrice)} ocultado` : 'Anuncio ocultado');
-  }
 
   // Actualizar todos los indicadores de precio
   updateAllPriceIndicators() {
@@ -1091,7 +1031,7 @@ class WallapopFilter {
     // Análisis automático al cargar
     setTimeout(() => {
       console.log('🔍 Iniciando análisis automático de precios...');
-      const priceElements = document.querySelectorAll('strong[class*="ItemCard__price"]');
+      const priceElements = this.findPriceElements();
       console.log(`💰 Precios encontrados: ${priceElements.length}`);
       
       if (priceElements.length > 0) {
@@ -1147,11 +1087,11 @@ class WallapopFilter {
       
       scrollTimeout = setTimeout(() => {
         // Verificar si hay nuevos elementos de precio
-        const priceElements = document.querySelectorAll('strong[class*="ItemCard__price"]');
+        const priceElements = this.findPriceElements();
         const currentPriceCount = priceElements.length;
         
         // Verificar si hay nuevos productos
-        const productElements = document.querySelectorAll('a[class*="ItemCard"], a[href*="/item/"]');
+        const productElements = this.getSearchResults();
         const currentProductCount = productElements.length;
         
         console.log(`📊 Scroll: ${currentPriceCount} precios, ${currentProductCount} productos (anterior: ${lastPriceCount} precios, ${lastProductCount} productos)`);
@@ -1272,12 +1212,7 @@ class WallapopFilter {
     console.log('🖼️ Primeras 5 URLs de imagen de la API:', apiImageUrls);
     
     // Debug adicional: Verificar si hay elementos ItemCard en el DOM
-    const itemCards = document.querySelectorAll('a[class*="ItemCard"], div[class*="ItemCard"]');
-    console.log(`🎯 Total de ItemCards en el DOM: ${itemCards.length}`);
-    
-    // Debug adicional: Verificar si hay elementos de precio
-    const priceElements = document.querySelectorAll('strong[class*="ItemCard__price"]');
-    console.log(`💰 Total de elementos de precio en el DOM: ${priceElements.length}`);
+    console.log(`🎯 Total de tarjetas en el DOM: ${this.getSearchResults().length}`);
     
     // Declarar variables fuera del setTimeout para evitar scope issues
     let currentMatches = 0;
@@ -1328,14 +1263,9 @@ class WallapopFilter {
         if (imageElement) {
           console.log(`✅ Imagen encontrada para: ${item.title}`);
 
-          // Buscar el contenedor principal del anuncio (el <a> que contiene todo)
-          const itemContainer = imageElement.closest('a[class*="ItemCard"]') ||
-                              imageElement.closest('a[href*="/item/"]') ||
-                              imageElement.closest('div[class*="ItemCard"]') ||
-                              imageElement.closest('div[class*="item-card"]') ||
-                              imageElement.closest('article') ||
-                              imageElement.closest('div[class*="card"]') ||
-                              imageElement.closest('div[class*="item"]');
+          // Tarjeta del anuncio (en la búsqueda, la imagen va en su propio enlace)
+          const itemContainer = this.getCard(imageElement) ||
+                              imageElement.closest('a[href*="/item/"]');
 
           if (itemContainer) {
             console.log(`✅ Contenedor encontrado:`, itemContainer.tagName, itemContainer.className);
@@ -1426,8 +1356,12 @@ class WallapopFilter {
                 userIdContainer.appendChild(userIdElement);
                 userIdContainer.appendChild(deleteButton);
 
-                // Insertar después del elemento de texto
-                titleElement.parentNode.insertBefore(userIdContainer, titleElement.nextSibling);
+                // Insertar tras el título; si el título es un enlace propio (búsqueda), tras el enlace
+                const titleLink = titleElement.closest('a');
+                const anchor = titleLink && titleLink !== itemContainer && itemContainer.contains(titleLink)
+                  ? titleLink
+                  : titleElement;
+                anchor.after(userIdContainer);
                 
                 console.log(`✅ User ID ${item.user_id} agregado para: ${item.title}`);
                 currentMatches++;
@@ -1495,81 +1429,21 @@ class WallapopFilter {
   // Ocultar todos los anuncios de un usuario
   // Eliminar completamente todos los anuncios de un usuario específico
   hideAllUserAds(userId) {
-    console.log(`🗑️ Eliminando completamente todos los anuncios del usuario: ${userId}`);
-    
-    // Agregar usuario a la lista de bloqueados
+    console.log(`🗑️ Eliminando todos los anuncios del usuario: ${userId}`);
     this.userBlocking.blockedUsers.add(userId);
-    
-    // Buscar todos los contenedores que tienen el user_id de este usuario
-    const userAds = document.querySelectorAll(`.wallapop-user-id-container`);
+
     let removedCount = 0;
-    let removedPrices = [];
-    
-    userAds.forEach(container => {
-      if (container.dataset.userId === String(userId)) {
-        // Encontrar el contenedor principal del anuncio
-        const itemContainer = container.closest('a[class*="ItemCard"]') ||
-                            container.closest('a[href*="/item/"]') ||
-                            container.closest('div[class*="ItemCard"]') ||
-                            container.closest('div[class*="item-card"]') ||
-                            container.closest('article');
-        
-        if (itemContainer) {
-          // Extraer el precio del anuncio antes de eliminarlo
-          const priceElement = itemContainer.querySelector('strong[class*="ItemCard__price"]');
-          if (priceElement) {
-            const price = this.extractPrice(priceElement);
-            if (price && price > 0 && price <= this.PRICE_MAX) {
-              removedPrices.push(price);
-            }
-          }
-          
-          // Eliminar completamente el anuncio del DOM
-          itemContainer.remove();
-          removedCount++;
-          
-          console.log(`✅ Anuncio eliminado: ${itemContainer.querySelector('h3')?.textContent || 'Sin título'}`);
-        }
-      }
+    document.querySelectorAll('.wallapop-user-id-container').forEach((container) => {
+      if (container.dataset.userId !== String(userId)) return;
+      const card = this.getCard(container) || container.closest('a[href*="/item/"], article');
+      if (!card) return;
+      card.remove();
+      removedCount++;
     });
-    
-    // Actualizar contador de anuncios bloqueados
+
     this.userBlocking.blockedAdsCount += removedCount;
-    
-    // Recalcular precio promedio si se eliminaron precios
-    if (removedPrices.length > 0 && this.priceAnalysis.allPrices.length > 0) {
-      console.log(`💰 Recalculando precio promedio después de eliminar ${removedPrices.length} precios...`);
-      
-      // Remover los precios eliminados de allPrices
-      removedPrices.forEach(price => {
-        const index = this.priceAnalysis.allPrices.indexOf(price);
-        if (index > -1) {
-          this.priceAnalysis.allPrices.splice(index, 1);
-        }
-      });
-      
-      // Recalcular promedio
-      if (this.priceAnalysis.allPrices.length > 0) {
-        this.priceAnalysis.averagePrice = this.priceAnalysis.allPrices.reduce((sum, price) => sum + price, 0) / this.priceAnalysis.allPrices.length;
-        
-        console.log(`📊 Nuevo precio promedio: ${this.priceAnalysis.averagePrice.toFixed(2)}€ (${this.priceAnalysis.allPrices.length} items restantes)`);
-        
-        // Actualizar el display del precio promedio
-        this.showAveragePriceDisplay();
-        
-        // Recalcular y actualizar todos los indicadores de precio
-        this.updateAllPriceIndicators();
-      } else {
-        console.log('⚠️ No quedan precios para calcular promedio');
-        // Remover el display del precio promedio
-        const averagePriceDisplay = document.querySelector('#wallapop-average-price-display');
-        if (averagePriceDisplay) {
-          averagePriceDisplay.remove();
-        }
-        this.updatePriceSummary();
-      }
-    }
-    
+    this.recalculatePrices();
+
     // Actualizar contador en la barra lateral
     this.updateKpiStats();
     
@@ -1698,11 +1572,11 @@ class WallapopFilter {
           <span>Vendedores bloqueados</span>
           <span class="ml-list__value" id="ml-blocked">0 · 0 anuncios</span>
         </div>
-        <div class="ml-list__row ml-row-seen">
-          <span>Vistos</span>
+        <div class="ml-list__row ml-row-hide">
+          <span>Ocultos</span>
           <span class="ml-list__value ml-list__actions">
-            <span id="ml-seen-count">0 en esta página</span>
-            <button type="button" class="ml-text-btn" id="ml-clear-seen" disabled>Borrar</button>
+            <span id="ml-hidden-count">0 en esta página</span>
+            <button type="button" class="ml-text-btn" id="ml-show-hidden" disabled>Mostrar todos</button>
           </span>
         </div>
       </div>
@@ -1814,7 +1688,7 @@ class WallapopFilter {
     });
 
     this.updateStatusIndicators();
-    this.refreshSeenMarks();
+    this.refreshHiddenAds();
   }
 
   // Punto de estado de la pestaña: verde activo, gris en pausa
@@ -1840,9 +1714,9 @@ class WallapopFilter {
     if (toggleBtn) toggleBtn.addEventListener('click', () => setOpen(false, true));
     if (this.sidebarTab) this.sidebarTab.addEventListener('click', () => setOpen(true, true));
 
-    // Borrar todas las marcas de visto
-    this.filterIndicator.querySelector('#ml-clear-seen')?.addEventListener('click', () => {
-      this.clearSeenItems().catch((error) => console.warn('⚠️ Error borrando vistos:', error.message));
+    // Volver a mostrar todos los anuncios ocultados
+    this.filterIndicator.querySelector('#ml-show-hidden')?.addEventListener('click', () => {
+      this.showAllHiddenAds().catch((error) => console.warn('⚠️ Error mostrando ocultos:', error.message));
     });
 
     // Interruptores de la configuración (uno por función)
@@ -2022,7 +1896,7 @@ document.addEventListener('keydown', (e) => {
 setTimeout(() => {
   window.testReservedFilter = function() {
     console.log('🧪 TEST MANUAL DE FILTRO RESERVADOS:');
-    const products = document.querySelectorAll('.item-card_ItemCard--vertical__CNrfk');
+    const products = document.querySelectorAll(ML_CARD_SELECTOR);
     const reserved = document.querySelectorAll('wallapop-badge[badge-type="reserved"]');
     console.log(`📦 Productos: ${products.length}`);
     console.log(`🔒 Reservados: ${reserved.length}`);
@@ -2046,7 +1920,7 @@ setTimeout(() => {
   };
 
   window.showAllProducts = function() {
-    const products = document.querySelectorAll('.item-card_ItemCard--vertical__CNrfk');
+    const products = document.querySelectorAll(ML_CARD_SELECTOR);
     products.forEach(product => {
       const card = product.closest('article, li, [data-testid="item-card"], .ItemCard, .item-card, [class*="ItemCard"], [class*="Card"]') || product;
       card.classList.remove('rs-hidden');

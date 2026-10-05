@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Wallapop · perfil de vendedor (simulado)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f4f5f6; }
+    header { background: #0b7566; color: #fff; padding: 14px 24px; font-weight: 700; font-size: 20px; }
+    main { display: grid; grid-template-columns: repeat(4, 200px); gap: 16px; padding: 24px; }
+    a { display: block; background: #fff; border-radius: 10px; overflow: hidden; color: #222; text-decoration: none; box-shadow: 0 1px 4px #0002; position: relative; }
+    img { width: 200px; height: 120px; display: block; }
+    .content { padding: 10px; }
+    strong { font-size: 18px; }
+    h3 { font-size: 14px; margin: 6px 0; font-weight: 400; }
+    wallapop-badge { display: inline-block; background: #6b6b6b; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+    wallapop-badge::after { content: attr(text); }
+  </style>
+</head>
+<body>
+  <header>wallapop — perfil del vendedor</header>
+  <main id="grid"></main>
+  <script>
+    // Tarjetas como las del perfil de un vendedor: toda la tarjeta es un <a>
+    window.addCard = (item) => document.getElementById('grid').insertAdjacentHTML('beforeend', `
+      <a class="item-card_ItemCard--vertical__CNrfk" href="/item/${item.id}">
+        <img src="https://cdn.wallapop.com/images/${item.id}.svg" alt="">
+        <div class="content">
+          <strong class="item-card_ItemCard__price__xyz">${item.price}</strong>
+          <h3 class="item-card_ItemCard__title__abc">${item.title}</h3>
+          ${item.reserved ? '<wallapop-badge badge-type="reserved" text="Reservado"></wallapop-badge>' : ''}
+        </div>
+      </a>`);
+
+    [
+      { id: 'a1', title: 'Bici montaña Orbea', price: '300 €', reserved: false },
+      { id: 'a2', title: 'Bici carretera BH', price: '100 €', reserved: true },
+      { id: 'a3', title: 'Bici urbana', price: '100 €', reserved: false },
+      { id: 'a4', title: 'Bici eléctrica', price: '400 €', reserved: true }
+    ].forEach(window.addCard);
+
+    // La búsqueda real se pide a la API después de pintar la página
+    setTimeout(() => fetch('https://api.wallapop.com/api/v3/search?keywords=bici').then((r) => r.json()), 1500);
+  </script>
+</body>
+</html>
