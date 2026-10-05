@@ -5,6 +5,11 @@ name: Release
 # convencionales. Si hay cambios que lo justifiquen, actualiza manifest.json y
 # package.json, crea la etiqueta vX.Y.Z y la release de GitHub con el .zip adjunto.
 # Si no hay commits que generen release (chore, docs, ci...) no publica nada.
+#
+# master exige cambios por PR, y el GITHUB_TOKEN no puede saltarse esa regla (el
+# github-actions[bot] no se puede añadir a la lista de bypass). Por eso el commit de
+# versión se sube con el secreto RELEASE_TOKEN: un token de alguien (o una GitHub App)
+# con permiso de bypass. Ver "Gestión de versiones" en CLAUDE.md.
 on:
   push:
     branches: [master]
@@ -30,6 +35,7 @@ jobs:
         with:
           fetch-depth: 0 # semantic-release lee el historial y las etiquetas
           persist-credentials: true # el plugin git sube el commit de versión
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
       - name: Configurar Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -63,5 +69,5 @@ jobs:
 
       - name: Publicar con semantic-release
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
         run: ./node_modules/.bin/semantic-release

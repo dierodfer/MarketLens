@@ -29,7 +29,7 @@ Elegir el tipo según el efecto para el usuario de la extensión: un cambio visi
 2. Al fusionar, [`release.yml`](.github/workflows/release.yml) pasa lint y tests y ejecuta semantic-release (configuración en [`.releaserc.json`](.releaserc.json)).
 3. Si hay commits que justifiquen release, `scripts/set-version.mjs` escribe la versión en `manifest.json` y `package.json`, `scripts/package.sh` genera `marketlens-vX.Y.Z.zip`, se sube el commit `chore(release): X.Y.Z [skip ci]`, se crea la etiqueta `vX.Y.Z` y la release de GitHub con el `.zip` adjunto.
 
-La versión base es `0.0.0` (etiqueta `v0.0.0`, creada por el workflow la primera vez), de modo que la primera release es la `0.0.1` con un `fix:` (un `feat:` daría `0.1.0`). No crear etiquetas ni releases a mano. Si `master` tiene protección de rama, el workflow necesita permiso para subir el commit de versión. Los tests no deben fijar un número de versión: leerlo de `manifest.json`.
+La versión base es `0.0.0` (etiqueta `v0.0.0`, creada por el workflow la primera vez), de modo que la primera release es la `0.0.1` con un `fix:` (un `feat:` daría `0.1.0`). No crear etiquetas ni releases a mano. `master` exige cambios por PR y el `GITHUB_TOKEN` no puede saltarse esa regla, así que el workflow sube el commit de versión con el secreto `RELEASE_TOKEN`: un token de alguien con permiso de bypass (o de una GitHub App añadida a la lista de bypass de la regla). Sin ese secreto, la publicación falla en el paso de semantic-release con `GH013: Changes must be made through a pull request`. Los tests no deben fijar un número de versión: leerlo de `manifest.json`.
 
 ## Reglas de trabajo
 
