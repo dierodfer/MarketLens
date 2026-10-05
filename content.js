@@ -1204,8 +1204,9 @@ class WallapopFilter {
   // Configurar listener de API
   setupApiListener() {
     this.onWindowMessage = (event) => {
-      // Solo aceptar mensajes de la propia página (inject.js)
-      if (event.source !== window || !event.data || typeof event.data !== 'object') return;
+      // Solo aceptar mensajes de la propia página (inject.js): misma ventana y mismo origen
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      if (!event.data || typeof event.data !== 'object') return;
       console.log('📨 Mensaje recibido:', event.data.type, event.data);
       
       if (event.data.type === 'WALLAPOP_USER_IDS') {

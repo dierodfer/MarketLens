@@ -357,6 +357,59 @@ test.describe('Configuración', () => {
   });
 });
 
+test.describe('Seguridad de los mensajes entre inject.js y la extensión', () => {
+  test('inject.js envía los mensajes solo al origen de la página', async ({ context }) => {
+    const page = await context.newPage();
+    await page.addInitScript(() => {
+      window.__sentMessages = [];
+      const original = window.postMessage.bind(window);
+      window.postMessage = (message, targetOrigin, ...rest) => {
+        if (message?.type?.startsWith('WALLAPOP_')) {
+          window.__sentMessages.push({ type: message.type, targetOrigin });
+        }
+        return original(message, targetOrigin, ...rest);
+      };
+    });
+    await page.goto(SEARCH_URL);
+
+    await expect.poll(() => page.evaluate(() => window.__sentMessages.length), { timeout: 15_000 }).toBeGreaterThan(0);
+    const sent = await page.evaluate(() => window.__sentMessages);
+
+    expect(sent.map((message) => message.type)).toEqual(
+      expect.arrayContaining(['WALLAPOP_USER_IDS', 'WALLAPOP_ITEMS_MATCHING'])
+    );
+    for (const message of sent) {
+      expect(message.targetOrigin).toBe('https://es.wallapop.com');
+    }
+  });
+
+  test('ignora los mensajes que no vienen de la propia página', async ({ search: page }) => {
+    await page.evaluate(() => {
+      window.addCard({ id: 'a5', title: 'Cebo', price: '50 €' });
+      window.addCard({ id: 'a6', title: 'Control', price: '60 €' });
+
+      const fakeMessage = (userId, imageId) => ({
+        type: 'WALLAPOP_ITEMS_MATCHING',
+        items: [{ user_id: userId, title: 'x', id: imageId, image_url: `https://cdn.wallapop.com/images/${imageId}.svg` }]
+      });
+
+      // Falsificado: lo envía un iframe aislado (otro origen y otra ventana)
+      const frame = document.createElement('iframe');
+      frame.setAttribute('sandbox', 'allow-scripts');
+      frame.srcdoc = `<script>parent.postMessage(${JSON.stringify(fakeMessage('intruso', 'a5'))}, '*')<\/script>`;
+      document.body.appendChild(frame);
+
+      // Legítimo (control): lo envía la propia página a su origen, como hace inject.js
+      window.postMessage(fakeMessage('legitimo', 'a6'), window.location.origin);
+    });
+
+    // El legítimo se acepta: así sabemos que la extensión ya ha procesado los mensajes
+    await expect(card(page, 'a6').locator('.wallapop-user-id-display')).toHaveText('legitimo', { timeout: 15_000 });
+    // El falsificado, no
+    await expect(card(page, 'a5').locator('.wallapop-user-id-container')).toHaveCount(0);
+  });
+});
+
 test.describe('Popup', () => {
   test('muestra nombre y versión', async ({ context, extensionId }) => {
     const popup = await context.newPage();
