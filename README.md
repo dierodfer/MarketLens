@@ -62,6 +62,8 @@
 git clone https://github.com/dierodfer/MarketLens.git
 ```
 
+**Desde una release**: descarga `marketlens-vX.Y.Z.zip` de la [página de releases](https://github.com/dierodfer/MarketLens/releases/latest) y descomprímelo.
+
 **Desde CI**: cada ejecución en verde de [GitHub Actions](https://github.com/dierodfer/MarketLens/actions/workflows/ci.yml) publica el artefacto `marketlens-extension`, un `.zip` listo para descomprimir.
 
 Después:
@@ -163,6 +165,17 @@ Un único job ordenado de lo más barato a lo más caro, para fallar cuanto ante
 2. `npm ci` e instalación de Chromium (sin headless shell ni paquetes del sistema).
 3. Tests E2E (`npm run test:e2e`). Si fallan, sube el informe de Playwright como artefacto `playwright-report`.
 4. Si todo pasa, publica la extensión como artefacto `marketlens-extension`.
+
+### Releases
+
+El workflow [`release.yml`](.github/workflows/release.yml) se lanza al publicar una etiqueta `vX.Y.Z` (o a mano indicando una etiqueta existente):
+
+1. Comprueba que la etiqueta coincide con `version` de `manifest.json`.
+2. Pasa lint, tests unitarios y E2E.
+3. Empaqueta la extensión en `marketlens-vX.Y.Z.zip` (manifest, scripts, estilos e iconos).
+4. Crea la release de GitHub con notas generadas y adjunta el `.zip`.
+
+Para publicar: sube `version` en `manifest.json` y `package.json`, mergea a `master` y ejecuta `git tag v1.0.1 && git push origin v1.0.1`.
 
 Otras decisiones:
 
