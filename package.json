@@ -1,6 +1,6 @@
 {
   "name": "marketlens",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Extensión de Chrome para filtrar reservas, comparar precios y bloquear vendedores en Wallapop",
   "scripts": {
