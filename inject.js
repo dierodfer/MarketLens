@@ -143,7 +143,7 @@
                     userIds: userIdsArray,
                     url: url,
                     count: userIdsArray.length
-                }, '*');
+                }, window.location.origin);
             }
             
             // Extraer también los items completos para hacer matching con el HTML
@@ -199,7 +199,7 @@
                     type: 'WALLAPOP_ITEMS_MATCHING',
                     items: items,
                     url: url
-                }, '*');
+                }, window.location.origin);
             }
         } catch (error) {
             console.log('❌ Error extrayendo user_ids:', error);
