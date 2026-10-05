@@ -64,4 +64,4 @@ jobs:
       - name: Publicar con semantic-release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: npx semantic-release
+        run: ./node_modules/.bin/semantic-release

@@ -1,6 +1,5 @@
 // Escribe la versión calculada por semantic-release en manifest.json y package.json.
 // Uso: node scripts/set-version.mjs 1.2.3
-import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const version = process.argv[2];
@@ -18,7 +17,10 @@ if (updated === manifest && !manifest.includes(`"version": "${version}"`)) {
 }
 writeFileSync('manifest.json', updated);
 
-// Actualiza package.json y package-lock.json sin crear commit ni etiqueta.
-execFileSync('npm', ['version', version, '--no-git-tag-version', '--allow-same-version'], {
-  stdio: 'inherit',
-});
+// package.json y package-lock.json: se reescriben como JSON (mismo formato, 2 espacios).
+for (const file of ['package.json', 'package-lock.json']) {
+  const json = JSON.parse(readFileSync(file, 'utf8'));
+  json.version = version;
+  if (json.packages?.['']) json.packages[''].version = version;
+  writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`);
+}
