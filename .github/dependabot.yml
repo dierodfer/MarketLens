@@ -9,7 +9,7 @@ updates:
       actions:
         patterns: ['*']
 
-  # Mantiene al día Playwright
+  # Mantiene al día Playwright y semantic-release
   - package-ecosystem: npm
     directory: /
     schedule:
@@ -17,3 +17,5 @@ updates:
     groups:
       playwright:
         patterns: ['@playwright/*', 'playwright*']
+      semantic-release:
+        patterns: ['semantic-release', '@semantic-release/*']
