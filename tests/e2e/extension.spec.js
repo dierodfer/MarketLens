@@ -104,6 +104,19 @@ test.describe('Bloqueo de vendedores', () => {
     }
   });
 
+  test('copiar el ID avisa si el portapapeles no está disponible', async ({ search: page }) => {
+    // El content script vive en un mundo aislado: hay que denegar el permiso de verdad
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Browser.setPermission', {
+      permission: { name: 'clipboard-write' },
+      setting: 'denied',
+      origin: new URL(page.url()).origin
+    });
+
+    await card(page, 'a1').locator('.wallapop-user-id-display').click();
+    await expect(page.locator('.ml-toast')).toHaveText('No se pudo copiar el ID');
+  });
+
   test('cancelar el diálogo no oculta nada', async ({ search: page }) => {
     await card(page, 'a1').getByRole('button', { name: 'Bloquear' }).click();
     const dialog = page.getByRole('alertdialog');

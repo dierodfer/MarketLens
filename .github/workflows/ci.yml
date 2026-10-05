@@ -44,13 +44,15 @@ jobs:
       - name: Tests unitarios
         run: npm run test:unit
 
+      # --ignore-scripts: ninguna dependencia necesita scripts de instalación
       - name: Instalar dependencias
-        run: npm ci --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       # Solo Chromium completo (sin headless shell, que no puede cargar extensiones).
       # Sin --with-deps: la imagen ubuntu-24.04 ya trae las librerías que necesita.
+      # Se usa el binario local (versión fijada por package-lock.json), no npx.
       - name: Instalar Chromium
-        run: npx playwright install chromium --no-shell
+        run: ./node_modules/.bin/playwright install chromium --no-shell
 
       - name: Tests E2E
         run: npm run test:e2e
