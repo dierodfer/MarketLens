@@ -1,42 +1,35 @@
 name: Release
 
-# Se lanza al publicar una etiqueta de versión (v1.2.3). Verifica que la etiqueta
-# coincide con la versión del manifest, pasa lint y tests, empaqueta la extensión
-# y la adjunta como .zip a la release de GitHub.
+# Se lanza en cada push a master (es decir, al fusionar una PR). Pasa lint y tests y
+# ejecuta semantic-release, que calcula la versión a partir de los commits
+# convencionales. Si hay cambios que lo justifiquen, actualiza manifest.json y
+# package.json, crea la etiqueta vX.Y.Z y la release de GitHub con el .zip adjunto.
+# Si no hay commits que generen release (chore, docs, ci...) no publica nada.
 on:
   push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+    branches: [master]
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Etiqueta existente a publicar (p. ej. v1.0.0)'
-        required: true
-        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}
   cancel-in-progress: false
-
-env:
-  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   release:
-    name: Probar, empaquetar y publicar
+    name: Probar y publicar
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
-      contents: write # crear la release y subir el .zip
+      contents: write # commit de versión, etiqueta y release
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.TAG }}
-          persist-credentials: false
+          fetch-depth: 0 # semantic-release lee el historial y las etiquetas
+          persist-credentials: true # el plugin git sube el commit de versión
 
       - name: Configurar Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -44,14 +37,8 @@ jobs:
           node-version-file: .nvmrc
           package-manager-cache: false
 
-      - name: Comprobar que la etiqueta coincide con el manifest
-        run: |
-          version="$(node -p "require('./manifest.json').version")"
-          if [ "$TAG" != "v$version" ]; then
-            echo "::error::La etiqueta $TAG no coincide con la versión del manifest (v$version)"
-            exit 1
-          fi
-          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Instalar dependencias
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Comprobar sintaxis
         run: npm run lint
@@ -59,33 +46,22 @@ jobs:
       - name: Tests unitarios
         run: npm run test:unit
 
-      - name: Instalar dependencias
-        run: npm ci --ignore-scripts --no-audit --no-fund
-
       - name: Instalar Chromium
         run: ./node_modules/.bin/playwright install chromium --no-shell
 
       - name: Tests E2E
         run: npm run test:e2e
 
-      # El .zip contiene los archivos en la raíz, listo para "Cargar descomprimida"
-      # o para subir a la Chrome Web Store.
-      - name: Empaquetar la extensión
+      # Sin etiquetas semantic-release publicaría 1.0.0. Se parte de v0.0.0 sobre el commit
+      # actual para que la primera release salga como 0.0.1 (el siguiente fix:).
+      - name: Crear la etiqueta base v0.0.0 si no hay ninguna
         run: |
-          zip -j -X "marketlens-${TAG}.zip" \
-            manifest.json background.js content.js inject.js \
-            popup.html popup.js styles.css
-          zip -X -r "marketlens-${TAG}.zip" icons -i 'icons/*.png'
-          unzip -l "marketlens-${TAG}.zip"
-
-      - name: Crear la release y adjuntar la extensión
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "marketlens-${TAG}.zip" --clobber
-          else
-            gh release create "$TAG" "marketlens-${TAG}.zip" \
-              --verify-tag --title "MarketLens ${TAG}" --generate-notes
+          if [ -z "$(git tag --list 'v*')" ]; then
+            git tag v0.0.0
+            git push origin v0.0.0
           fi
+
+      - name: Publicar con semantic-release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./node_modules/.bin/semantic-release

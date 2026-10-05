@@ -168,14 +168,16 @@ Un único job ordenado de lo más barato a lo más caro, para fallar cuanto ante
 
 ### Releases
 
-El workflow [`release.yml`](.github/workflows/release.yml) se lanza al publicar una etiqueta `vX.Y.Z` (o a mano indicando una etiqueta existente):
+La versión no se edita a mano: la calcula [semantic-release](https://semantic-release.gitbook.io) a partir de [commits convencionales](https://www.conventionalcommits.org). El workflow [`release.yml`](.github/workflows/release.yml) se lanza al fusionar en `master`:
 
-1. Comprueba que la etiqueta coincide con `version` de `manifest.json`.
-2. Pasa lint, tests unitarios y E2E.
-3. Empaqueta la extensión en `marketlens-vX.Y.Z.zip` (manifest, scripts, estilos e iconos).
-4. Crea la release de GitHub con notas generadas y adjunta el `.zip`.
+1. Pasa lint, tests unitarios y E2E.
+2. semantic-release analiza los commits desde la última etiqueta: `fix:` sube el parche, `feat:` la versión menor y `BREAKING CHANGE` la mayor. `chore:`, `docs:`, `ci:` o `test:` no publican nada.
+3. Si toca publicar, actualiza `version` en `manifest.json` y `package.json`, crea el commit `chore(release)` y la etiqueta `vX.Y.Z`.
+4. Crea la release de GitHub con notas generadas y adjunta `marketlens-vX.Y.Z.zip` (manifest, scripts, estilos e iconos).
 
-Para publicar: sube `version` en `manifest.json` y `package.json`, mergea a `master` y ejecuta `git tag v1.0.1 && git push origin v1.0.1`.
+La primera ejecución crea la etiqueta base `v0.0.0` (el manifest parte de `0.0.0`), así que la primera release es la `0.0.1` con el siguiente `fix:` (un `feat:` daría `0.1.0`).
+
+Para publicar basta con fusionar a `master` una PR con commits convencionales. Si `master` tiene protección de rama, el workflow necesita poder subir el commit de versión (ver [`.releaserc.json`](.releaserc.json)).
 
 Otras decisiones:
 
@@ -205,10 +207,12 @@ MarketLens/
 │   └── fixtures/            # Página de búsqueda simulada
 ├── scripts/check-syntax.mjs
 ├── playwright.config.js
+├── .releaserc.json          # Configuración de semantic-release
 ├── .nvmrc                   # Versión de Node.js
 └── .github/
     ├── workflows/ci.yml     # CI en pull requests
-    └── dependabot.yml       # Actualización semanal de actions y Playwright
+    ├── workflows/release.yml # Release automática con semantic-release
+    └── dependabot.yml       # Actualización semanal de actions, Playwright y semantic-release
 ```
 
 ## Contribuir

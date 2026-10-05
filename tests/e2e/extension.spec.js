@@ -363,7 +363,7 @@ test.describe('Popup', () => {
     await popup.goto(`chrome-extension://${extensionId}/popup.html`);
 
     await expect(popup.getByRole('heading', { name: 'MarketLens' })).toBeVisible();
-    await expect(popup.locator('#version')).toHaveText('Versión 1.0.0');
+    await expect(popup.locator('#version')).toHaveText(`Versión ${require('../../manifest.json').version}`);
     // Abierto fuera de Wallapop avisa de que hay que abrir una búsqueda
     await expect(popup.locator('#connection')).toHaveText('Abre una búsqueda en Wallapop');
   });

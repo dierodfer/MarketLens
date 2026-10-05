@@ -25,15 +25,11 @@ Elegir el tipo según el efecto para el usuario de la extensión: un cambio visi
 
 ### Cómo se produce una release
 
-Flujo previsto:
-
 1. Los commits convencionales llegan a `master` mediante PR.
-2. semantic-release analiza los commits desde la última etiqueta, decide la versión siguiente y, si hay cambios que lo justifiquen, actualiza `manifest.json` y `package.json`, crea la etiqueta `vX.Y.Z` y la release de GitHub con las notas generadas.
-3. El workflow [`release.yml`](.github/workflows/release.yml) pasa lint y tests, empaqueta la extensión en `marketlens-vX.Y.Z.zip` y lo adjunta a la release.
+2. Al fusionar, [`release.yml`](.github/workflows/release.yml) pasa lint y tests y ejecuta semantic-release (configuración en [`.releaserc.json`](.releaserc.json)).
+3. Si hay commits que justifiquen release, `scripts/set-version.mjs` escribe la versión en `manifest.json` y `package.json`, `scripts/package.sh` genera `marketlens-vX.Y.Z.zip`, se sube el commit `chore(release): X.Y.Z [skip ci]`, se crea la etiqueta `vX.Y.Z` y la release de GitHub con el `.zip` adjunto.
 
-### Estado actual
-
-El repositorio **todavía no está adaptado** a este flujo: `release.yml` se dispara al subir una etiqueta `vX.Y.Z` manual y exige que coincida con la versión del manifest, y el README describe subir la versión a mano. Hasta que se configure semantic-release (dependencia, configuración y workflow que ejecute `semantic-release` y haga el commit de versión), conviene no crear etiquetas ni subir versiones manualmente. Al adaptarlo, mantener el empaquetado del `.zip` y actualizar la sección «Releases» del README.
+La versión base es `0.0.0` (etiqueta `v0.0.0`, creada por el workflow la primera vez), de modo que la primera release es la `0.0.1` con un `fix:` (un `feat:` daría `0.1.0`). No crear etiquetas ni releases a mano. Si `master` tiene protección de rama, el workflow necesita permiso para subir el commit de versión. Los tests no deben fijar un número de versión: leerlo de `manifest.json`.
 
 ## Reglas de trabajo
 
