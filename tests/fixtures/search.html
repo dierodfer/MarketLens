@@ -2,34 +2,53 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Wallapop (simulado)</title>
+  <title>Wallapop · búsqueda (simulado)</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 0; background: #f4f5f6; }
     header { background: #0b7566; color: #fff; padding: 14px 24px; font-weight: 700; font-size: 20px; }
-    main { display: grid; grid-template-columns: repeat(4, 200px); gap: 16px; padding: 24px; }
-    a { display: block; background: #fff; border-radius: 10px; overflow: hidden; color: #222; text-decoration: none; box-shadow: 0 1px 4px #0002; position: relative; }
+    .grid { display: grid; grid-template-columns: repeat(4, 200px); gap: 16px; padding: 24px; }
+    article { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px #0002; color: #222; }
+    article a { color: inherit; text-decoration: none; }
+    .image { position: relative; }
     img { width: 200px; height: 120px; display: block; }
+    .favorite { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border-radius: 50%; border: none; background: #fff; }
     .content { padding: 10px; }
-    strong { font-size: 18px; }
-    h3 { font-size: 14px; margin: 6px 0; font-weight: 400; }
-    wallapop-badge { display: inline-block; background: #6b6b6b; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+    h3 { font-size: 14px; margin: 0 0 6px; font-weight: 400; }
+    .price span { font-size: 18px; font-weight: 700; }
+    wallapop-badge { display: inline-block; background: #6b6b6b; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-top: 6px; }
     wallapop-badge::after { content: attr(text); }
   </style>
 </head>
 <body>
   <header>wallapop — búsqueda: "bici"</header>
-  <main id="grid"></main>
+  <div class="item-card-grid-module-scss-module__ZT7hta__ItemCardGrid grid" id="grid" aria-label="Items list"></div>
   <script>
-    // Tarjetas con la misma estructura de clases que Wallapop
+    // Tarjetas con la estructura de la búsqueda real: <article> con un enlace en la imagen,
+    // otro en el título, el precio fuera de ambos y el corazón de favoritos arriba a la derecha
     window.addCard = (item) => document.getElementById('grid').insertAdjacentHTML('beforeend', `
-      <a class="item-card_ItemCard--vertical__CNrfk" href="/item/${item.id}">
-        <img src="https://cdn.wallapop.com/images/${item.id}.svg" alt="">
-        <div class="content">
-          <strong class="item-card_ItemCard__price__xyz">${item.price}</strong>
-          <h3 class="item-card_ItemCard__title__abc">${item.title}</h3>
-          ${item.reserved ? '<wallapop-badge badge-type="reserved" text="Reservado"></wallapop-badge>' : ''}
+      <div><article class="retrieval-item-card-module_RetrievalItemCard__ckj4h" data-orientation="vertical" data-variant="default">
+        <div class="retrieval-item-card-module_RetrievalItemCard__image__GZ-KG image">
+          <div class="composition-item-card-image-module_carousel__VP1QF">
+            <a class="composition-item-card-image-module_carousel__link__MVpAi" href="https://es.wallapop.com/item/${item.id}" target="_blank" rel="noopener" aria-label="${item.title}">
+              <div class="composition-item-card-image-module_carousel__slide__XyIRX">
+                <img class="composition-item-card-image-module_media__Hq-M0" alt="${item.title}" loading="lazy" src="https://cdn.wallapop.com/images/${item.id}.svg?pictureSize=W640">
+              </div>
+            </a>
+          </div>
+          <span><button type="button" class="retrieval-item-card-module_RetrievalItemCard__favorite__DZ0Ol favorite" aria-pressed="false" aria-label="Save as favorite">♡</button></span>
         </div>
-      </a>`);
+        <div class="retrieval-item-card-module_RetrievalItemCard__content__nA7gw content">
+          <div class="retrieval-item-card-module_RetrievalItemCard__group__QMFlH">
+            <a href="https://es.wallapop.com/item/${item.id}" target="_blank" rel="noopener" class="retrieval-item-card-module_RetrievalItemCard__titleLink__cvSDT">
+              <h3 class="retrieval-item-card-module_RetrievalItemCard__title__GjAq9">${item.title}</h3>
+            </a>
+            <div class="retrieval-item-card-module_RetrievalItemCard__price__zXvlG price">
+              <span class="retrieval-item-card-module_RetrievalItemCard__currentPrice__mOTcZ" aria-label="Current price">${item.price.replace(' ', ' ')}</span>
+            </div>
+          </div>
+          ${item.reserved ? '<wallapop-badge role="status" badge-type="reserved" text="Reservado"></wallapop-badge>' : '<wallapop-badge role="status" badge-type="shippingAvailable" text="Envío disponible"></wallapop-badge>'}
+        </div>
+      </article></div>`);
 
     [
       { id: 'a1', title: 'Bici montaña Orbea', price: '300 €', reserved: false },

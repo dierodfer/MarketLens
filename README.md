@@ -46,11 +46,10 @@
 | 🔎 | **Filtro de reservas** | Muestra todos los anuncios, solo los disponibles o solo los reservados. Se aplica también a los que se cargan al hacer scroll. |
 | 📈 | **Análisis de precios** | Calcula el precio medio y el rango de la búsqueda, y marca en cada anuncio cuánto está por encima (rojo) o por debajo (verde) de la media. |
 | 🚫 | **Bloqueo de vendedores** | Muestra el ID del vendedor en cada anuncio (clic para copiarlo) y permite ocultar todos sus anuncios de una vez. |
-| ✕ | **Ocultar anuncios sueltos** | Quita de la página un anuncio concreto y recalcula la media sin él. |
-| 👁 | **Marcar como visto** | Cubre el anuncio con un velo gris sin quitarlo de la página. La marca se guarda: sigue ahí al recargar o repetir la búsqueda. |
+| ✕ | **Ocultar anuncios** | Oculta un anuncio al momento y recalcula la media sin él. Queda un hueco con un ojo 👁 para volver a mostrarlo, y se recuerda al recargar o repetir la búsqueda. |
 | 🌗 | **Modo claro y oscuro** | El panel sigue la apariencia del sistema. |
 | ⚙️ | **Configuración por usuario** | Cada función se activa o desactiva desde el panel (ver más abajo). |
-| 💾 | **Preferencias guardadas** | El filtro elegido, la configuración y los anuncios vistos se recuerdan entre sesiones. |
+| 💾 | **Preferencias guardadas** | El filtro elegido, la configuración y los anuncios ocultos se recuerdan entre sesiones. |
 
 ## Instalación
 
@@ -86,9 +85,9 @@ Probada en Chrome; debería funcionar en otros navegadores basados en Chromium (
 | Pestaña lateral | Borde derecho | Abre el panel. El punto indica el estado: verde activo, gris en pausa. |
 | Configuración | Panel, sección plegable | Interruptor por función; el del filtro lo pausa sin perder la selección. |
 | Pastilla de precio | Junto al precio de cada anuncio | Diferencia respecto a la media. |
-| Botón del ojo | Esquina superior derecha de cada anuncio | Marca o desmarca el anuncio como visto (velo gris). Se puede deshacer pulsando de nuevo. |
+| × / 👁 | Esquina superior izquierda de cada anuncio | La × lo oculta al momento; en su hueco queda un ojo para volver a mostrarlo. |
 | Chip del vendedor | Bajo el título | Clic para copiar su ID; **Bloquear** oculta todos sus anuncios. |
-| Vistos | Panel | Cuántos anuncios vistos hay en la página y **Borrar** para quitar todas las marcas. |
+| Ocultos | Panel | Cuántos anuncios ocultos hay en la página y **Mostrar todos** para recuperarlos. |
 | Precio medio | Esquina inferior izquierda | Media y número de anuncios analizados. |
 | Icono de la barra | Barra de Chrome | Estado de la conexión con la pestaña de Wallapop. |
 
@@ -102,10 +101,9 @@ El panel tiene una sección plegable **Configuración** con un interruptor por f
 | **Análisis de precios** | Desaparecen la tarjeta de precio medio, las pastillas de diferencia y las filas de precio medio y rango del panel. |
 | **Vendedor de cada anuncio** | Desaparece el ID del vendedor (y, con él, el botón de bloquear). |
 | **Bloquear vendedores** | Desaparece el botón **Bloquear** y la fila de bloqueados. Requiere que el vendedor se muestre. |
-| **Ocultar anuncios** | Desaparece la × de cada tarjeta. |
-| **Marcar como visto** | Desaparecen el ojo, el velo gris y la fila **Vistos**. Las marcas ya hechas se conservan y vuelven al reactivarla. |
+| **Ocultar anuncios** | Desaparecen la × y la fila **Ocultos**, y los anuncios ocultos vuelven a verse. Se recuerdan y vuelven a ocultarse al reactivarla. |
 
-Desactivar una función no deshace lo ya hecho: los anuncios que ocultaste o los vendedores que bloqueaste no vuelven hasta recargar la página.
+Desactivar una función no deshace lo ya hecho: los vendedores que bloqueaste no vuelven hasta recargar la página.
 
 ## Cómo funciona
 
@@ -144,7 +142,14 @@ Para depurar en una página real de Wallapop:
 
 ## Tests e integración continua
 
-Los tests E2E usan [Playwright](https://playwright.dev) con la extensión cargada de verdad en Chromium. Wallapop, su API y las imágenes se sirven en local desde [`tests/fixtures/search.html`](tests/fixtures/search.html), así que los tests no dependen de la red ni de los cambios de la web real.
+Los tests E2E usan [Playwright](https://playwright.dev) con la extensión cargada de verdad en Chromium. Wallapop, su API y las imágenes se sirven en local, así que los tests no dependen de la red ni de los cambios de la web real.
+
+Wallapop usa dos formatos de tarjeta y cada test se ejecuta con los dos (proyectos `busqueda` y `perfil` de Playwright):
+
+| Formato | Página simulada | Tarjeta |
+|---|---|---|
+| Búsqueda | [`tests/fixtures/search.html`](tests/fixtures/search.html) | `<article>` con un enlace en la imagen y otro en el título; el precio va fuera de ambos |
+| Perfil de un vendedor | [`tests/fixtures/profile.html`](tests/fixtures/profile.html) | Toda la tarjeta es un `<a>` |
 
 Qué se comprueba:
 
@@ -153,7 +158,7 @@ Qué se comprueba:
 - La media, el rango y las diferencias de precio son correctos y se recalculan al cargar más anuncios.
 - Cada anuncio muestra su vendedor según la API; bloquearlo oculta sus anuncios y actualiza la media.
 - Cada interruptor de la configuración activa o desactiva su función y se recuerda tras recargar.
-- Marcar como visto aplica el velo, no oculta ni cambia la media, respeta el filtro, sobrevive a una recarga y se puede borrar desde el panel.
+- Ocultar un anuncio es inmediato, deja un ojo para mostrarlo, recalcula la media, sobrevive a una recarga y se puede deshacer desde el panel.
 - Los diálogos son propios de la extensión, nunca `confirm()` del navegador.
 - La página no lanza errores de JavaScript.
 
@@ -204,7 +209,7 @@ MarketLens/
 ├── tests/
 │   ├── unit/                # Tests del manifest (node:test)
 │   ├── e2e/                 # Tests de Playwright y su fixture
-│   └── fixtures/            # Página de búsqueda simulada
+│   └── fixtures/            # Wallapop simulado: búsqueda y perfil de vendedor
 ├── scripts/check-syntax.mjs
 ├── playwright.config.js
 ├── .releaserc.json          # Configuración de semantic-release

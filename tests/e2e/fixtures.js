@@ -4,8 +4,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const EXTENSION_PATH = path.resolve(__dirname, '../..');
-const SEARCH_URL = 'https://es.wallapop.com/app/search?keywords=bici';
-const SEARCH_HTML = fs.readFileSync(path.join(__dirname, '../fixtures/search.html'), 'utf8');
+const fixture = (name) => fs.readFileSync(path.join(__dirname, `../fixtures/${name}`), 'utf8');
+
+// Wallapop usa dos formatos de tarjeta: el de la búsqueda (<article>) y el del perfil de un vendedor (<a>)
+const LAYOUTS = {
+  search: { url: 'https://es.wallapop.com/search?keywords=bici', html: fixture('search.html') },
+  profile: { url: 'https://es.wallapop.com/user/vendedor-123', html: fixture('profile.html') }
+};
+const pageFor = (url) => (new URL(url).pathname.startsWith('/user/') ? LAYOUTS.profile : LAYOUTS.search);
 
 // Vendedor de cada anuncio en la respuesta simulada de la API
 const SELLERS = { a1: 'u1', a2: 'u2', a3: 'u3', a4: 'u4' };
@@ -31,6 +37,11 @@ const PLACEHOLDER_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="200" hei
 
 const test = base.extend({
   colorScheme: ['light', { option: true }],
+  layout: ['search', { option: true }],
+
+  searchUrl: async ({ layout }, use) => {
+    await use(LAYOUTS[layout].url);
+  },
 
   context: async ({ colorScheme }, use) => {
     // CHROMIUM_PATH permite usar un Chromium ya instalado (no Chrome: no carga extensiones)
@@ -52,7 +63,7 @@ const test = base.extend({
     await context.route('**/*', (route) => {
       const url = route.request().url();
       if (url.startsWith('https://es.wallapop.com/')) {
-        return route.fulfill({ contentType: 'text/html', body: SEARCH_HTML });
+        return route.fulfill({ contentType: 'text/html', body: pageFor(url).html });
       }
       if (url.includes('api.wallapop.com')) {
         return route.fulfill({
@@ -81,7 +92,7 @@ const test = base.extend({
   },
 
   // Página de búsqueda con la extensión ya inicializada y los vendedores emparejados
-  search: async ({ context }, use) => {
+  search: async ({ context, searchUrl }, use) => {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -90,7 +101,7 @@ const test = base.extend({
       await dialog.dismiss();
     });
 
-    await page.goto(SEARCH_URL);
+    await page.goto(searchUrl);
     await expect(page.locator('#ml-tab')).toBeVisible();
     await expect(page.locator('.wallapop-user-id-container')).toHaveCount(4, { timeout: 15_000 });
     await expect(page.locator('#wallapop-average-price-display')).toBeVisible({ timeout: 15_000 });
@@ -101,11 +112,15 @@ const test = base.extend({
   }
 });
 
-// Helpers
-const card = (page, id) => page.locator(`a[href="/item/${id}"]`);
+// Helpers válidos para los dos formatos de tarjeta
+const CARDS = 'a.item-card_ItemCard--vertical__CNrfk, article[class*="ItemCard"]';
+const card = (page, id) =>
+  page.locator(`a.item-card_ItemCard--vertical__CNrfk[href$="/item/${id}"], article[class*="ItemCard"]:has(a[href$="/item/${id}"])`);
 const visibleIds = (page) =>
-  page.locator('.item-card_ItemCard--vertical__CNrfk:not(.rs-hidden)').evaluateAll((cards) =>
-    cards.map((c) => c.getAttribute('href').replace('/item/', ''))
+  page.locator(CARDS).evaluateAll((cards) =>
+    cards
+      .filter((c) => !c.classList.contains('rs-hidden'))
+      .map((c) => (c.matches('a') ? c : c.querySelector('a[href*="/item/"]')).getAttribute('href').split('/item/')[1])
   );
 
-module.exports = { test, expect, card, visibleIds, SEARCH_URL };
+module.exports = { test, expect, card, visibleIds };
