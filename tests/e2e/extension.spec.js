@@ -175,6 +175,14 @@ test.describe('Ocultar anuncios', () => {
     expect(parents).toEqual([true, true, true, true]);
   });
 
+  test('la × está arriba a la derecha de la tarjeta', async ({ search: page }) => {
+    const cardBox = await card(page, 'a1').boundingBox();
+    const buttonBox = await hideButton(page, 'a1').boundingBox();
+    expect(buttonBox.x + buttonBox.width).toBeGreaterThan(cardBox.x + cardBox.width - 8);
+    expect(buttonBox.x).toBeGreaterThan(cardBox.x + cardBox.width / 2);
+    expect(buttonBox.y).toBeLessThan(cardBox.y + 8);
+  });
+
   test('la × oculta al momento, sin diálogo, y deja un ojo para volver a mostrarlo', async ({ search: page }) => {
     await hideButton(page, 'a4').click();
 
@@ -184,9 +192,19 @@ test.describe('Ocultar anuncios', () => {
     await expect(showButton(page, 'a4')).toBeVisible();
     await expect(showButton(page, 'a4')).toHaveAttribute('aria-pressed', 'true');
 
-    // Queda un hueco compacto, y la media ya no lo cuenta
+    // Queda una tarjeta blanca con borde, con el ojo y la frase centrados, y la media ya no la cuenta
+    await expect(card(page, 'a4')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await expect(card(page, 'a4')).toHaveCSS('border-top-style', 'solid');
+    await expect(card(page, 'a4')).toHaveCSS('border-top-color', 'rgb(210, 210, 215)');
+    await expect(showButton(page, 'a4')).toContainText('Anuncio oculto');
     const box = await card(page, 'a4').boundingBox();
-    expect(box.height).toBeLessThanOrEqual(50);
+    const eye = await showButton(page, 'a4').locator('.ml-hide-circle').boundingBox();
+    const label = await showButton(page, 'a4').locator('.ml-hide-label').boundingBox();
+    const centerX = box.x + box.width / 2;
+    expect(Math.abs(eye.x + eye.width / 2 - centerX)).toBeLessThan(4);
+    expect(Math.abs(label.x + label.width / 2 - centerX)).toBeLessThan(4);
+    expect(eye.y).toBeGreaterThan(box.y + 10);
+    expect(label.y + label.height).toBeLessThan(box.y + box.height - 10);
     await expect(page.locator('#wallapop-average-price-display')).toContainText('167 €');
     await expect(page.locator('#wallapop-average-price-display')).toContainText('3 anuncios');
     await expect(card(page, 'a1').locator('.wallapop-price-indicator')).toHaveText('+133 €');
@@ -200,10 +218,16 @@ test.describe('Ocultar anuncios', () => {
     await expect(page.locator('#wallapop-average-price-display')).toContainText('4 anuncios');
   });
 
-  test('un anuncio oculto no se abre al pulsar su hueco', async ({ search: page }) => {
+  test('se puede pulsar en cualquier punto de la tarjeta oculta, y no abre el anuncio', async ({ search: page }) => {
     await hideButton(page, 'a1').click();
-    await expect(card(page, 'a1')).toHaveCSS('pointer-events', 'none');
-    await expect(showButton(page, 'a1')).toHaveCSS('pointer-events', 'auto');
+    const [popup] = await Promise.all([
+      page.waitForEvent('popup', { timeout: 1500 }).catch(() => null),
+      card(page, 'a1').click({ position: { x: 6, y: 120 } })
+    ]);
+
+    expect(popup).toBeNull();
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-ad-hidden/);
+    await expect(hideButton(page, 'a1')).toBeVisible();
   });
 
   test('los ocultos sobreviven a una recarga y el panel los muestra todos', async ({ search: page }) => {
@@ -245,13 +269,163 @@ test.describe('Ocultar anuncios', () => {
   });
 });
 
+test.describe('Palabras excluidas', () => {
+  const filteredButton = (page, id) => card(page, id).getByRole('button', { name: /mostrar unos segundos/ });
+
+  async function addWord(page, text) {
+    await page.locator('#ml-tab').click();
+    await page.locator('#ml-words-input').fill(text);
+    await page.locator('#ml-words-input').press('Enter');
+  }
+
+  test('una palabra del título oculta el anuncio con otro icono y otra frase', async ({ search: page }) => {
+    await addWord(page, 'Orbea');
+
+    await expect(card(page, 'a1')).toHaveClass(/ml-ad-filtered/);
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-ad-hidden/);
+    await expect(filteredButton(page, 'a1')).toContainText('Contiene «Orbea»');
+    await expect(card(page, 'a1').locator('h3')).toBeHidden();
+    // Mismo aspecto de tarjeta blanca con borde, pero otro icono (naranja) que el de un anuncio oculto
+    await expect(card(page, 'a1')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await expect(filteredButton(page, 'a1').locator('.ml-hide-circle')).toHaveCSS('background-color', 'rgb(255, 159, 10)');
+    await expect(filteredButton(page, 'a1').locator('svg circle')).toHaveCount(1);
+
+    // Los demás no cambian, y la media ya no cuenta el filtrado (100, 100 y 400)
+    await expect(card(page, 'a2')).not.toHaveClass(/ml-ad-filtered/);
+    await expect(page.locator('#wallapop-average-price-display')).toContainText('200 €');
+    await expect(page.locator('#wallapop-average-price-display')).toContainText('3 anuncios');
+    await expect(page.locator('#ml-words-count')).toHaveText('1 oculto en esta página');
+    await expect(page.locator('#ml-words-list')).toContainText('Orbea');
+  });
+
+  test('ignora mayúsculas y acentos, y coincide al principio de una palabra', async ({ search: page }) => {
+    await addWord(page, 'ELECTRICA');
+    await expect(card(page, 'a4')).toHaveClass(/ml-ad-filtered/);
+
+    // "bi" empieza "Bici" en los cuatro, pero "ici" no empieza ninguna palabra
+    await page.locator('#ml-words-input').fill('ici');
+    await page.locator('#ml-words-input').press('Enter');
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-ad-filtered/);
+    await expect(card(page, 'a4')).toHaveClass(/ml-ad-filtered/);
+  });
+
+  test('también filtra por la descripción que llega con la API', async ({ search: page }) => {
+    // "cesta" solo aparece en la descripción del anuncio a3
+    await addWord(page, 'cesta');
+
+    await expect(card(page, 'a3')).toHaveClass(/ml-ad-filtered/);
+    await expect(filteredButton(page, 'a3')).toContainText('Descripción con «cesta»');
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-ad-filtered/);
+  });
+
+  test('un clic en la tarjeta la muestra unos segundos y vuelve a ocultarla', async ({ search: page }) => {
+    await addWord(page, 'Orbea');
+    await expect(card(page, 'a1')).toHaveClass(/ml-ad-filtered/);
+
+    // Pulsar en cualquier punto de la tarjeta
+    await card(page, 'a1').click({ position: { x: 6, y: 120 } });
+    await expect(card(page, 'a1')).toHaveClass(/ml-ad-peek/);
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-ad-filtered/);
+    await expect(card(page, 'a1').locator('h3')).toBeVisible();
+
+    // Pasados unos segundos se oculta sola
+    await expect(card(page, 'a1')).toHaveClass(/ml-ad-filtered/, { timeout: 9_000 });
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-ad-peek/);
+    await expect(card(page, 'a1').locator('h3')).toBeHidden();
+  });
+
+  test('quitar la palabra devuelve el anuncio y recalcula la media', async ({ search: page }) => {
+    await addWord(page, 'Orbea');
+    await expect(page.locator('#wallapop-average-price-display')).toContainText('3 anuncios');
+
+    await page.getByRole('button', { name: 'Quitar «Orbea»' }).click();
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-ad-filtered/);
+    await expect(page.locator('#wallapop-average-price-display')).toContainText('225 €');
+    await expect(page.locator('#wallapop-average-price-display')).toContainText('4 anuncios');
+    await expect(page.locator('#ml-words-count')).toHaveText('Sin palabras');
+  });
+
+  test('las palabras sobreviven a una recarga y no se repiten', async ({ search: page }) => {
+    await addWord(page, 'Orbea');
+    await page.locator('#ml-words-input').fill('orbéa');
+    await page.locator('#ml-words-input').press('Enter');
+    await expect(page.locator('.ml-toast')).toHaveText('Esa palabra ya está en la lista');
+    await expect(page.locator('#ml-words-list li')).toHaveCount(1);
+
+    await page.reload();
+    await expect(card(page, 'a1')).toHaveClass(/ml-ad-filtered/, { timeout: 15_000 });
+    await page.locator('#ml-tab').click();
+    await expect(page.locator('#ml-words-list')).toContainText('Orbea');
+  });
+
+  test('un anuncio oculto a mano manda sobre el filtrado por palabra', async ({ search: page }) => {
+    await card(page, 'a1').getByRole('button', { name: /Ocultar este anuncio/ }).click();
+    await addWord(page, 'Orbea');
+
+    await expect(card(page, 'a1')).toHaveClass(/ml-ad-hidden/);
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-ad-filtered/);
+    await expect(card(page, 'a1').getByRole('button', { name: 'Mostrar anuncio' })).toBeVisible();
+  });
+
+  test('el texto escrito no se interpreta como HTML ni como expresión regular', async ({ search: page }) => {
+    await addWord(page, '<img src=x onerror=alert(1)>');
+    await expect(page.locator('#ml-words-list li')).toHaveCount(1);
+    await expect(page.locator('#ml-words-list img')).toHaveCount(0);
+
+    await page.locator('#ml-words-input').fill('.*');
+    await page.locator('#ml-words-input').press('Enter');
+    await expect(page.locator('.ml-ad-filtered')).toHaveCount(0);
+  });
+
+  test('el título y la descripción se pueden buscar por separado', async ({ search: page }) => {
+    await addWord(page, 'orbea');
+    await page.locator('#ml-words-input').fill('cesta');
+    await page.locator('#ml-words-input').press('Enter');
+    await expect(card(page, 'a1')).toHaveClass(/ml-ad-filtered/);
+    await expect(card(page, 'a3')).toHaveClass(/ml-ad-filtered/);
+    await page.locator('#ml-settings summary').click();
+
+    // Sin el título solo queda lo de la descripción
+    await featureSwitch(page, 'titles').click();
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-ad-filtered/);
+    await expect(card(page, 'a3')).toHaveClass(/ml-ad-filtered/);
+
+    // Sin ninguno de los dos no se filtra nada
+    await featureSwitch(page, 'descriptions').click();
+    await expect(page.locator('.ml-ad-filtered')).toHaveCount(0);
+
+    // Solo el título
+    await featureSwitch(page, 'titles').click();
+    await expect(card(page, 'a1')).toHaveClass(/ml-ad-filtered/);
+    await expect(card(page, 'a3')).not.toHaveClass(/ml-ad-filtered/);
+  });
+
+  test('desactivar la función, o la descripción, lo refleja al momento', async ({ search: page }) => {
+    await addWord(page, 'cesta');
+    await expect(card(page, 'a3')).toHaveClass(/ml-ad-filtered/);
+    await page.locator('#ml-settings summary').click();
+
+    await featureSwitch(page, 'descriptions').click();
+    await expect(card(page, 'a3')).not.toHaveClass(/ml-ad-filtered/);
+    await featureSwitch(page, 'descriptions').click();
+    await expect(card(page, 'a3')).toHaveClass(/ml-ad-filtered/);
+
+    await featureSwitch(page, 'keywords').click();
+    await expect(card(page, 'a3')).not.toHaveClass(/ml-ad-filtered/);
+    await expect(page.locator('#ml-words-form')).toBeHidden();
+    await expect(featureInput(page, 'descriptions')).toBeDisabled();
+    await expect(featureInput(page, 'titles')).toBeDisabled();
+    await expect(page.locator('#wallapop-average-price-display')).toContainText('4 anuncios');
+  });
+});
+
 test.describe('Configuración', () => {
   test('hay un interruptor por función, todos activos de serie', async ({ search: page }) => {
     await openSettings(page);
-    for (const key of ['filter', 'prices', 'sellers', 'blocking', 'hide']) {
+    for (const key of ['filter', 'prices', 'sellers', 'blocking', 'hide', 'keywords', 'titles', 'descriptions']) {
       await expect(featureInput(page, key)).toBeChecked();
     }
-    await expect(page.locator('#ml-settings input[data-feature]')).toHaveCount(5);
+    await expect(page.locator('#ml-settings input[data-feature]')).toHaveCount(8);
   });
 
   test('análisis de precios', async ({ search: page }) => {
@@ -424,6 +598,17 @@ test.describe('Capturas', () => {
         await page.waitForTimeout(400);
         await page.screenshot({ path: testInfo.outputPath(`panel-${scheme}.png`) });
         expect(new URL(page.url()).pathname).toBe('/search');
+      });
+
+      test(`palabras excluidas (${scheme})`, async ({ search: page }, testInfo) => {
+        await card(page, 'a2').getByRole('button', { name: /Ocultar este anuncio/ }).click();
+        await page.locator('#ml-tab').click();
+        await page.locator('#ml-words-input').fill('Orbea');
+        await page.locator('#ml-words-input').press('Enter');
+        await page.locator('#ml-words-input').fill('cesta');
+        await page.locator('#ml-words-input').press('Enter');
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: testInfo.outputPath(`words-${scheme}.png`) });
       });
 
       test(`configuración (${scheme})`, async ({ search: page }, testInfo) => {

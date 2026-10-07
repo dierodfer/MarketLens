@@ -165,6 +165,8 @@
                                 user_id: item.user_id,
                                 title: item.title,
                                 id: item.id,
+                                web_slug: item.web_slug,
+                                description: item.description,
                                 image_url: imageUrl
                             });
                         }
@@ -185,6 +187,8 @@
                                 user_id: item.user_id,
                                 title: item.title,
                                 id: item.id,
+                                web_slug: item.web_slug,
+                                description: item.description,
                                 image_url: imageUrl
                             });
                         }

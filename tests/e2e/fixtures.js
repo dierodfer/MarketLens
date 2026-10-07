@@ -16,6 +16,14 @@ const pageFor = (url) => (new URL(url).pathname.startsWith('/user/') ? LAYOUTS.p
 // Vendedor de cada anuncio en la respuesta simulada de la API
 const SELLERS = { a1: 'u1', a2: 'u2', a3: 'u3', a4: 'u4' };
 
+// Descripción de cada anuncio en la respuesta simulada de la API (la tarjeta no la muestra)
+const DESCRIPTIONS = {
+  a1: 'Bicicleta de montaña en buen estado, talla M.',
+  a2: 'Carretera ligera. Revisada en taller.',
+  a3: 'Urbana con CESTA delantera y portaequipajes.',
+  a4: 'Eléctrica con batería nueva, autonomía de 60 km.'
+};
+
 function apiResponse() {
   return {
     data: {
@@ -23,7 +31,9 @@ function apiResponse() {
         payload: {
           items: Object.entries(SELLERS).map(([id, userId]) => ({
             id,
+            web_slug: id,
             title: id,
+            description: DESCRIPTIONS[id],
             user_id: userId,
             images: [{ urls: { medium: `https://cdn.wallapop.com/images/${id}.svg` } }]
           }))

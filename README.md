@@ -20,10 +20,14 @@
   <img src="docs/screenshot-dark.png" alt="Panel de MarketLens en modo oscuro" width="49%">
 </p>
 <p align="center">
+  <img src="docs/words-light.png" alt="Anuncios ocultos y filtrados por palabras, y la lista de palabras excluidas" width="49%">
+  <img src="docs/words-dark.png" alt="Lo mismo en modo oscuro" width="49%">
+</p>
+<p align="center">
   <img src="docs/settings-light.png" alt="Sección de configuración del panel" width="49%">
   <img src="docs/settings-dark.png" alt="Sección de configuración del panel en modo oscuro" width="49%">
 </p>
-<p align="center"><sub>Capturas generadas por los tests sobre una página que imita a Wallapop. Abajo, la configuración con «Ocultar anuncios» desactivado.</sub></p>
+<p align="center"><sub>Capturas generadas por los tests sobre una página que imita a Wallapop. En la segunda fila, anuncios ocultados a mano (ojo azul) y filtrados por palabras (círculo naranja), y abajo la configuración.</sub></p>
 
 ---
 
@@ -46,7 +50,8 @@
 | 🔎 | **Filtro de reservas** | Muestra todos los anuncios, solo los disponibles o solo los reservados. Se aplica también a los que se cargan al hacer scroll. |
 | 📈 | **Análisis de precios** | Calcula el precio medio y el rango de la búsqueda, y marca en cada anuncio cuánto está por encima (rojo) o por debajo (verde) de la media. |
 | 🚫 | **Bloqueo de vendedores** | Muestra el ID del vendedor en cada anuncio (clic para copiarlo) y permite ocultar todos sus anuncios de una vez. |
-| ✕ | **Ocultar anuncios** | Oculta un anuncio al momento y recalcula la media sin él. Queda un hueco con un ojo 👁 para volver a mostrarlo, y se recuerda al recargar o repetir la búsqueda. |
+| ✕ | **Ocultar anuncios** | Oculta un anuncio al momento y recalcula la media sin él. En su lugar queda una tarjeta con borde, con un ojo 👁 y «Anuncio oculto» en el centro; se pulsa en cualquier punto para volver a mostrarlo. Se recuerda al recargar o repetir la búsqueda. |
+| 🔎 | **Palabras excluidas** | Escribe una palabra o frase en el panel y se ocultan los anuncios que la contienen, en el título o en la descripción. En su lugar queda una tarjeta con un círculo naranja y «Contiene «palabra»»; un clic la muestra unos segundos y vuelve a ocultarse sola. |
 | 🌗 | **Modo claro y oscuro** | El panel sigue la apariencia del sistema. |
 | ⚙️ | **Configuración por usuario** | Cada función se activa o desactiva desde el panel (ver más abajo). |
 | 💾 | **Preferencias guardadas** | El filtro elegido, la configuración y los anuncios ocultos se recuerdan entre sesiones. |
@@ -85,7 +90,8 @@ Probada en Chrome; debería funcionar en otros navegadores basados en Chromium (
 | Pestaña lateral | Borde derecho | Abre el panel. El punto indica el estado: verde activo, gris en pausa. |
 | Configuración | Panel, sección plegable | Interruptor por función; el del filtro lo pausa sin perder la selección. |
 | Pastilla de precio | Junto al precio de cada anuncio | Diferencia respecto a la media. |
-| × / 👁 | Esquina superior izquierda de cada anuncio | La × lo oculta al momento; en su hueco queda un ojo para volver a mostrarlo. |
+| × / 👁 | Esquina superior derecha de cada anuncio | La × lo oculta al momento; la tarjeta que queda se pulsa entera para volver a mostrarlo. |
+| Palabras excluidas | Panel | Campo para añadir palabras o frases, lista para quitarlas y cuántos anuncios ocultan en la página. |
 | Chip del vendedor | Bajo el título | Clic para copiar su ID; **Bloquear** oculta todos sus anuncios. |
 | Ocultos | Panel | Cuántos anuncios ocultos hay en la página y **Mostrar todos** para recuperarlos. |
 | Precio medio | Esquina inferior izquierda | Media y número de anuncios analizados. |
@@ -102,6 +108,11 @@ El panel tiene una sección plegable **Configuración** con un interruptor por f
 | **Vendedor de cada anuncio** | Desaparece el ID del vendedor (y, con él, el botón de bloquear). |
 | **Bloquear vendedores** | Desaparece el botón **Bloquear** y la fila de bloqueados. Requiere que el vendedor se muestre. |
 | **Ocultar anuncios** | Desaparecen la × y la fila **Ocultos**, y los anuncios ocultos vuelven a verse. Se recuerdan y vuelven a ocultarse al reactivarla. |
+| **Palabras excluidas** | Se quita la sección del panel y dejan de filtrarse anuncios. La lista se conserva. |
+| **Buscar en el título** | Las palabras dejan de compararse con el título. |
+| **Buscar en la descripción** | Las palabras dejan de compararse con la descripción. Con los dos desactivados no se filtra nada. Ambos requieren «Palabras excluidas». |
+
+Cómo se comparan las palabras: sin distinguir mayúsculas ni acentos (`electrica` encuentra «Eléctrica») y desde el principio de una palabra (`funda` encuentra «fundas», pero `tv` no encuentra «estuviera»). Una frase tiene que aparecer completa y en ese orden. La descripción no se ve en la tarjeta: viene en la misma respuesta de la API de búsqueda que la página ya pide para pintar los anuncios (no se hace ninguna petición extra), así que solo se puede comparar en los anuncios que esa respuesta incluye. Un anuncio ocultado a mano manda sobre uno filtrado por palabras.
 
 Desactivar una función no deshace lo ya hecho: los vendedores que bloqueaste no vuelven hasta recargar la página.
 
@@ -158,7 +169,8 @@ Qué se comprueba:
 - La media, el rango y las diferencias de precio son correctos y se recalculan al cargar más anuncios.
 - Cada anuncio muestra su vendedor según la API; bloquearlo oculta sus anuncios y actualiza la media.
 - Cada interruptor de la configuración activa o desactiva su función y se recuerda tras recargar.
-- Ocultar un anuncio es inmediato, deja un ojo para mostrarlo, recalcula la media, sobrevive a una recarga y se puede deshacer desde el panel.
+- Ocultar un anuncio es inmediato, deja una tarjeta con un ojo para mostrarlo, recalcula la media, sobrevive a una recarga y se puede deshacer desde el panel.
+- Una palabra excluida oculta por título o descripción, no distingue mayúsculas ni acentos, y el anuncio filtrado se puede ver unos segundos.
 - Los diálogos son propios de la extensión, nunca `confirm()` del navegador.
 - La página no lanza errores de JavaScript.
 

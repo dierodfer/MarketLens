@@ -298,9 +298,120 @@ html.ml-off-prices .ml-row-prices,
 html.ml-off-sellers .wallapop-user-id-container,
 html.ml-off-blocking .wallapop-delete-user-btn,
 html.ml-off-blocking .ml-row-blocking,
-html.ml-off-hide .wallapop-delete-ad-btn,
-html.ml-off-hide .ml-row-hide {
+html.ml-off-hide .wallapop-delete-ad-btn:not([data-mode="filtered"]),
+html.ml-off-hide .ml-row-hide,
+html.ml-off-keywords .ml-section-keywords {
   display: none !important;
+}
+
+.ml-words {
+  padding: 14px 16px 12px;
+}
+
+.ml-words__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ml-words__title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ml-words__count {
+  font-size: 12px;
+  color: var(--ml-text-2);
+}
+
+.ml-words__form {
+  display: flex;
+  gap: 8px;
+}
+
+.ml-words__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--ml-fill);
+  color: var(--ml-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.ml-words__input::placeholder {
+  color: var(--ml-text-2);
+}
+
+.ml-words__input:focus-visible {
+  outline: 2px solid var(--ml-accent);
+  outline-offset: 1px;
+}
+
+.ml-root .ml-words__add {
+  min-height: 36px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--ml-accent);
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ml-words__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ml-words__list:empty {
+  display: none;
+}
+
+.ml-word {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 2px 4px 2px 10px;
+  border-radius: 999px;
+  background: var(--ml-fill);
+  font-size: 13px;
+}
+
+.ml-word > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ml-root .ml-word__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ml-text-2);
+  cursor: pointer;
+}
+
+.ml-root .ml-word__remove:hover {
+  color: var(--ml-text);
 }
 
 .ml-section-label {
@@ -578,7 +689,8 @@ html.ml-off-hide .ml-row-hide {
 .wallapop-delete-ad-btn {
   position: absolute !important;
   top: 2px !important;
-  left: 2px !important;
+  right: 2px !important;
+  left: auto !important;
   z-index: 999 !important;
   width: 44px !important;
   height: 44px !important;
@@ -611,37 +723,77 @@ html.ml-off-hide .ml-row-hide {
   transform: scale(1.08);
 }
 
-/* Anuncio oculto: queda un hueco compacto con un ojo para volver a mostrarlo */
-.ml-ad-hidden {
+/* Anuncio oculto o filtrado por una palabra: tarjeta blanca con borde y, en el centro, icono y frase.
+   El botón cubre toda la tarjeta, así que se puede pulsar en cualquier punto. */
+.ml-ad-hidden,
+.ml-ad-filtered {
   position: relative !important;
-  height: 48px !important;
+  height: 128px !important;
   min-height: 0 !important;
   overflow: hidden !important;
-  background: transparent !important;
-  box-shadow: none !important;
+  background: #ffffff !important;
+  border: 1.5px solid #d2d2d7 !important;
   border-radius: 12px !important;
-  outline: 1.5px dashed rgba(134, 134, 139, 0.6) !important;
-  outline-offset: -1.5px;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
   pointer-events: none !important;
 }
 
-.ml-ad-hidden > :not(.wallapop-delete-ad-btn) {
+.ml-ad-hidden > :not(.wallapop-delete-ad-btn),
+.ml-ad-filtered > :not(.wallapop-delete-ad-btn) {
   visibility: hidden !important;
 }
 
-.ml-ad-hidden::after {
-  content: "Anuncio oculto" !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 48px !important;
-  font: 500 13px/48px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif !important;
-  color: #86868b !important;
-  pointer-events: none !important;
+.ml-ad-hidden > .wallapop-delete-ad-btn,
+.ml-ad-filtered > .wallapop-delete-ad-btn {
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  border-radius: 10px !important;
+  font: 500 13px/1.3 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif !important;
+  color: #6e6e73 !important;
+  text-align: center !important;
+  padding: 0 12px !important;
 }
 
-.ml-ad-hidden > .wallapop-delete-ad-btn .ml-hide-circle {
+.ml-ad-hidden > .wallapop-delete-ad-btn:hover,
+.ml-ad-filtered > .wallapop-delete-ad-btn:hover {
+  background: #f5f5f7 !important;
+}
+
+.ml-ad-hidden > .wallapop-delete-ad-btn:focus-visible,
+.ml-ad-filtered > .wallapop-delete-ad-btn:focus-visible {
+  outline: 2px solid #0071e3 !important;
+  outline-offset: -4px !important;
+}
+
+.ml-ad-hidden .ml-hide-circle,
+.ml-ad-filtered .ml-hide-circle {
+  width: 36px;
+  height: 36px;
+  box-shadow: none;
   background: #0071e3;
   color: #ffffff;
+}
+
+.ml-ad-filtered .ml-hide-circle {
+  background: #ff9f0a;
+}
+
+.ml-ad-hidden .ml-hide-label,
+.ml-ad-filtered .ml-hide-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Anuncio filtrado que se muestra unos segundos: se distingue y vuelve a ocultarse solo */
+.ml-ad-peek {
+  outline: 2px dashed #ff9f0a !important;
+  outline-offset: -2px !important;
 }
 
 .wallapop-user-id-container {
