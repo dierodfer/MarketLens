@@ -7,7 +7,9 @@ const ML_FEATURES = [
   { key: 'prices', title: 'Análisis de precios', description: 'Media, rango y diferencia en cada anuncio' },
   { key: 'sellers', title: 'Vendedor de cada anuncio', description: 'Muestra su ID y permite copiarlo' },
   { key: 'blocking', title: 'Bloquear vendedores', description: 'Oculta todos los anuncios de un vendedor' },
-  { key: 'hide', title: 'Ocultar anuncios', description: 'La × oculta y el ojo lo recupera' }
+  { key: 'hide', title: 'Ocultar anuncios', description: 'La × oculta y el ojo lo recupera' },
+  { key: 'keywords', title: 'Palabras excluidas', description: 'Oculta los anuncios que las contienen' },
+  { key: 'descriptions', title: 'Buscar también en la descripción', description: 'No solo en el título del anuncio' }
 ];
 
 // Tarjeta de un anuncio: la del perfil de un vendedor es un <a>, la de la búsqueda un <article>
@@ -29,6 +31,7 @@ const ML_ICONS = {
   logo: (size = 22) => ML_SVG(size, '<circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5L21 21"></path><path d="M7.5 12.5l2-2 1.8 1.5 2.4-3"></path>'),
   close: ML_SVG(12, '<path d="M5 5l14 14M19 5L5 19"></path>', ' stroke-width="2.6"'),
   eye: ML_SVG(14, '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle>', ' stroke-width="2.2"'),
+  ban: ML_SVG(14, '<circle cx="12" cy="12" r="9"></circle><path d="M5.6 5.6l12.8 12.8"></path>', ' stroke-width="2.2"'),
   trend: ML_SVG(16, '<path d="M3 17l6-6 4 4 8-8"></path><path d="M15 7h6v6"></path>'),
   book: ML_SVG(18, '<path d="M3 4.5h6a3 3 0 013 3V20a2 2 0 00-2-2H3z"></path><path d="M21 4.5h-6a3 3 0 00-3 3V20a2 2 0 012-2h7z"></path>', ' stroke-width="1.7"'),
   coffee: ML_SVG(18, '<path d="M4 9h12v5a5 5 0 01-5 5H9a5 5 0 01-5-5z"></path><path d="M16 10h1.5a2.5 2.5 0 010 5H16"></path><path d="M8 3.5v2M12 3.5v2"></path>', ' stroke-width="1.7"'),
@@ -48,11 +51,24 @@ class WallapopFilter {
   PRICE_MAX = 100000;
 
   // Funciones activables (el filtro se guarda aparte, en extensionEnabled)
-  features = { prices: true, sellers: true, blocking: true, hide: true };
+  features = { prices: true, sellers: true, blocking: true, hide: true, keywords: true, descriptions: true };
 
   // Anuncios ocultados (ruta /item/...) y máximo que se recuerda
   hiddenItems = new Set();
   HIDDEN_MAX = 5000;
+
+  // Palabras o frases excluidas, sus comparadores y los anuncios que se muestran un momento
+  blockedWords = [];
+  wordMatchers = [];
+  WORDS_MAX = 200;
+  WORD_MAX_LENGTH = 60;
+  PEEK_MS = 5000;
+  peekTimers = new Map();
+
+  // Descripciones que llegan con la respuesta de la API, por ruta del anuncio (/item/...)
+  itemDescriptions = new Map();
+  DESCRIPTIONS_MAX = 3000;
+  DESCRIPTION_MAX_LENGTH = 5000;
 
   // Flag para detectar si el contexto está invalidado
   contextInvalidated = false;
@@ -252,7 +268,11 @@ class WallapopFilter {
     
     // Quitar botones de ocultar y su estado: la instancia nueva los vuelve a crear
     document.querySelectorAll('.wallapop-delete-ad-btn').forEach((element) => element.remove());
-    document.querySelectorAll('.ml-ad-hidden').forEach((element) => element.classList.remove('ml-ad-hidden'));
+    document.querySelectorAll('.ml-ad-hidden, .ml-ad-filtered, .ml-ad-peek').forEach((element) => {
+      element.classList.remove('ml-ad-hidden', 'ml-ad-filtered', 'ml-ad-peek');
+    });
+    this.peekTimers.forEach((timer) => clearTimeout(timer));
+    this.peekTimers.clear();
     
     // Remover sidebar del DOM
     if (this.filterIndicator) {
@@ -306,7 +326,7 @@ class WallapopFilter {
 
   async loadSettings() {
     try {
-      const result = await chrome.storage.local.get(['filterMode', 'extensionEnabled', 'features', 'hiddenItems', 'seenItems']);
+      const result = await chrome.storage.local.get(['filterMode', 'extensionEnabled', 'features', 'hiddenItems', 'blockedWords', 'seenItems']);
       this.filterMode = result.filterMode || 'all';
       this.extensionEnabled = result.extensionEnabled !== undefined ? result.extensionEnabled : true;
       for (const key of Object.keys(this.features)) {
@@ -315,6 +335,10 @@ class WallapopFilter {
       if (Array.isArray(result.hiddenItems)) {
         this.hiddenItems = new Set(result.hiddenItems.filter((key) => typeof key === 'string'));
         this.refreshHiddenAds();
+      }
+      if (Array.isArray(result.blockedWords)) {
+        this.setBlockedWords(result.blockedWords);
+        this.renderWordList();
       }
       // La antigua función "visto" ya no existe: se borran sus marcas
       if (result.seenItems !== undefined) {
@@ -496,10 +520,10 @@ class WallapopFilter {
     return null;
   }
 
-  // Precios de los anuncios de la página, sin contar los ocultados
+  // Precios de los anuncios de la página, sin contar los ocultados ni los filtrados por palabras
   findPriceElements() {
     return this.getSearchResults()
-      .filter((card) => !this.isAdHidden(card))
+      .filter((card) => this.getAdHold(card) === null)
       .map((card) => this.findCardPrice(card))
       .filter(Boolean);
   }
@@ -535,7 +559,7 @@ class WallapopFilter {
     card.style.zIndex = '2';
   }
 
-  // Botón de la tarjeta: × para ocultar el anuncio; si está oculto, un ojo para mostrarlo
+  // Botón de la tarjeta: × para ocultar; en un anuncio oculto o filtrado cubre toda la tarjeta
   ensureHideButton(card) {
     this.prepareCardContainer(card);
     if (card.querySelector(':scope > .wallapop-delete-ad-btn')) return;
@@ -545,7 +569,11 @@ class WallapopFilter {
     btn.className = 'wallapop-delete-ad-btn';
     btn.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-      this.toggleAdHidden(card);
+      if (btn.dataset.mode === 'filtered') {
+        this.peekAd(card);
+      } else {
+        this.toggleAdHidden(card);
+      }
     });
 
     card.appendChild(btn);
@@ -588,6 +616,7 @@ class WallapopFilter {
     this.filterIndicator?.querySelectorAll('input[data-feature]').forEach((input) => {
       input.checked = this.isFeatureEnabled(input.dataset.feature);
       if (input.dataset.feature === 'blocking') input.disabled = !this.features.sellers;
+      if (input.dataset.feature === 'descriptions') input.disabled = !this.features.keywords;
     });
   }
 
@@ -610,7 +639,7 @@ class WallapopFilter {
     this.features[key] = enabled;
     this.applyFeatureClasses();
     this.syncSettingsUi();
-    if (key === 'hide') {
+    if (key === 'hide' || key === 'keywords' || key === 'descriptions') {
       this.refreshHiddenAds();
       this.recalculatePrices();
     }
@@ -657,36 +686,93 @@ class WallapopFilter {
     return key !== null && this.hiddenItems.has(key);
   }
 
-  // Refleja en una tarjeta si está oculta: contenido escondido y el botón pasa a ser un ojo
+  // Por qué una tarjeta no cuenta ni se muestra: { kind: 'manual' }, { kind: 'word', word } o null
+  getAdHold(card) {
+    if (this.isAdHidden(card)) return { kind: 'manual' };
+    const match = this.findBlockedWord(card);
+    return match === null ? null : { kind: 'word', ...match };
+  }
+
+  // Refleja en una tarjeta su estado: visible, oculta, filtrada por una palabra o mostrada un momento
   syncHiddenCard(card) {
-    const hidden = this.isAdHidden(card);
-    card.classList.toggle('ml-ad-hidden', hidden);
+    const hold = this.getAdHold(card);
+    let mode = 'visible';
+    if (hold?.kind === 'manual') mode = 'hidden';
+    else if (hold) mode = this.peekTimers.has(card) ? 'peek' : 'filtered';
+
+    card.classList.toggle('ml-ad-hidden', mode === 'hidden');
+    card.classList.toggle('ml-ad-filtered', mode === 'filtered');
+    card.classList.toggle('ml-ad-peek', mode === 'peek');
 
     const btn = card.querySelector(':scope > .wallapop-delete-ad-btn');
-    if (btn && btn.dataset.state !== String(hidden)) {
-      const price = this.extractPrice(this.findCardPrice(card));
-      const label = hidden
-        ? 'Mostrar anuncio'
-        : `Ocultar este anuncio${price ? ` (${this.formatPrice(price)})` : ''}`;
-      btn.dataset.state = String(hidden);
-      btn.title = label;
-      btn.setAttribute('aria-label', label);
-      btn.setAttribute('aria-pressed', String(hidden));
-      btn.innerHTML = `<span class="ml-hide-circle">${hidden ? ML_ICONS.eye : ML_ICONS.close}</span>`;
+    const state = `${mode}:${hold?.word ?? ''}:${hold?.where ?? ''}`;
+    if (btn && btn.dataset.state !== state) {
+      btn.dataset.state = state;
+      btn.dataset.mode = mode;
+      this.renderHideButton(btn, card, mode, hold);
     }
-    return hidden;
+    return hold !== null;
+  }
+
+  renderHideButton(btn, card, mode, hold) {
+    const word = hold?.word;
+    const inDescription = hold?.where === 'description';
+    let label;
+    let html;
+    if (mode === 'hidden') {
+      label = 'Mostrar anuncio';
+      html = `<span class="ml-hide-circle">${ML_ICONS.eye}</span><span class="ml-hide-label"></span>`;
+    } else if (mode === 'filtered') {
+      label = `${inDescription ? 'La descripción contiene' : 'Contiene'} «${word}»: mostrar unos segundos`;
+      html = `<span class="ml-hide-circle">${ML_ICONS.ban}</span><span class="ml-hide-label"></span>`;
+    } else {
+      const price = this.extractPrice(this.findCardPrice(card));
+      label = `Ocultar este anuncio${price ? ` (${this.formatPrice(price)})` : ''}`;
+      html = `<span class="ml-hide-circle">${ML_ICONS.close}</span>`;
+    }
+
+    btn.innerHTML = html;
+    const text = btn.querySelector('.ml-hide-label');
+    if (text) {
+      text.textContent = mode === 'hidden'
+        ? 'Anuncio oculto'
+        : `${inDescription ? 'Descripción con' : 'Contiene'} «${word}»`;
+    }
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-pressed', String(mode === 'hidden'));
+  }
+
+  // Muestra unos segundos un anuncio filtrado por palabras y lo vuelve a ocultar
+  peekAd(card) {
+    clearTimeout(this.peekTimers.get(card));
+    this.peekTimers.set(card, setTimeout(() => {
+      this.peekTimers.delete(card);
+      if (card.isConnected) this.syncHiddenCard(card);
+    }, this.PEEK_MS));
+    this.syncHiddenCard(card);
   }
 
   // Botón en todas las tarjetas, estado de cada una y contador del panel
   refreshHiddenAds() {
     let hiddenOnPage = 0;
+    let filteredOnPage = 0;
     this.getSearchResults().forEach((card) => {
       this.ensureHideButton(card);
-      if (this.syncHiddenCard(card)) hiddenOnPage++;
+      this.syncHiddenCard(card);
+      const hold = this.getAdHold(card);
+      if (hold?.kind === 'manual') hiddenOnPage++;
+      else if (hold) filteredOnPage++;
     });
 
     const count = this.filterIndicator?.querySelector('#ml-hidden-count');
     if (count) count.textContent = `${hiddenOnPage} en esta página`;
+    const filtered = this.filterIndicator?.querySelector('#ml-words-count');
+    if (filtered) {
+      filtered.textContent = this.blockedWords.length === 0
+        ? 'Sin palabras'
+        : `${filteredOnPage} ${filteredOnPage === 1 ? 'oculto' : 'ocultos'} en esta página`;
+    }
     const showAll = this.filterIndicator?.querySelector('#ml-show-hidden');
     if (showAll) showAll.disabled = this.hiddenItems.size === 0;
   }
@@ -738,6 +824,122 @@ class WallapopFilter {
     this.refreshHiddenAds();
     this.saveHiddenItems();
     this.recalculatePrices();
+  }
+
+  // ===== PALABRAS EXCLUIDAS =====
+
+  // Sin mayúsculas ni acentos, para que "Eléctrica" y "electrica" coincidan
+  normalizeText(text) {
+    return String(text).normalize('NFD').replaceAll(/\p{M}/gu, '').toLowerCase().trim().replaceAll(/\s+/g, ' ');
+  }
+
+  // Fija la lista y prepara un comparador por palabra: coincide al principio de una palabra
+  // ("funda" encuentra "fundas", pero "tv" no encuentra "estuviera")
+  setBlockedWords(words) {
+    const seen = new Set();
+    this.blockedWords = [];
+    for (const word of words) {
+      if (typeof word !== 'string') continue;
+      const clean = word.trim().replaceAll(/\s+/g, ' ').slice(0, this.WORD_MAX_LENGTH);
+      const key = this.normalizeText(clean);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      this.blockedWords.push(clean);
+      if (this.blockedWords.length >= this.WORDS_MAX) break;
+    }
+
+    this.wordMatchers = this.blockedWords.map((word) => {
+      const pattern = this.normalizeText(word).replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`).replaceAll(' ', String.raw`\s+`);
+      return { word, regex: new RegExp(String.raw`(?<![\p{L}\p{N}])${pattern}`, 'u') };
+    });
+  }
+
+  // Título del anuncio
+  getCardTitle(card) {
+    const title = card.querySelector('[class*="ItemCard__title"], h3');
+    if (title?.textContent) return title.textContent;
+    return card.querySelector('img')?.alt ?? card.querySelector('a[aria-label]')?.getAttribute('aria-label') ?? '';
+  }
+
+  // Guarda las descripciones de la respuesta de la API (ya normalizadas) y revisa las tarjetas
+  storeDescriptions(items) {
+    if (!Array.isArray(items)) return;
+
+    let added = 0;
+    for (const item of items) {
+      if (typeof item?.web_slug !== 'string' || typeof item.description !== 'string' || !item.description) continue;
+      const key = `/item/${item.web_slug}`;
+      this.itemDescriptions.delete(key);
+      this.itemDescriptions.set(key, this.normalizeText(item.description.slice(0, this.DESCRIPTION_MAX_LENGTH)));
+      added++;
+      // Al llegar al máximo se olvidan las más antiguas
+      if (this.itemDescriptions.size > this.DESCRIPTIONS_MAX) {
+        this.itemDescriptions.delete(this.itemDescriptions.keys().next().value);
+      }
+    }
+
+    if (added > 0 && this.features.descriptions && this.wordMatchers.length > 0) {
+      this.refreshHiddenAds();
+      this.recalculatePrices();
+    }
+  }
+
+  // Primera palabra excluida que contiene la tarjeta: { word, where: 'title' | 'description' } o null
+  findBlockedWord(card) {
+    if (!this.features.keywords || this.wordMatchers.length === 0) return null;
+
+    const title = this.normalizeText(this.getCardTitle(card));
+    const inTitle = title && this.wordMatchers.find(({ regex }) => regex.test(title));
+    if (inTitle) return { word: inTitle.word, where: 'title' };
+
+    if (!this.features.descriptions) return null;
+    const key = this.getItemKey(card);
+    const description = key === null ? undefined : this.itemDescriptions.get(key);
+    const inDescription = description && this.wordMatchers.find(({ regex }) => regex.test(description));
+    return inDescription ? { word: inDescription.word, where: 'description' } : null;
+  }
+
+  addBlockedWord(text) {
+    const before = this.blockedWords.length;
+    this.setBlockedWords([...this.blockedWords, text]);
+    const added = this.blockedWords.length > before;
+    if (added) this.afterWordsChange();
+    return added;
+  }
+
+  removeBlockedWord(word) {
+    this.setBlockedWords(this.blockedWords.filter((item) => item !== word));
+    this.afterWordsChange();
+  }
+
+  afterWordsChange() {
+    this.peekTimers.forEach((timer) => clearTimeout(timer));
+    this.peekTimers.clear();
+    this.renderWordList();
+    this.refreshHiddenAds();
+    this.recalculatePrices();
+    this.saveSettings({ blockedWords: [...this.blockedWords] });
+  }
+
+  // Lista de palabras del panel, una etiqueta con su botón de quitar
+  renderWordList() {
+    const list = this.filterIndicator?.querySelector('#ml-words-list');
+    if (!list) return;
+
+    list.replaceChildren(...this.blockedWords.map((word) => {
+      const item = document.createElement('li');
+      item.className = 'ml-word';
+      const text = document.createElement('span');
+      text.textContent = word;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'ml-word__remove';
+      remove.setAttribute('aria-label', `Quitar «${word}»`);
+      remove.innerHTML = ML_ICONS.close;
+      remove.addEventListener('click', () => this.removeBlockedWord(word));
+      item.append(text, remove);
+      return item;
+    }));
   }
 
   // Media y rango con los anuncios visibles (sin los ocultados ni los bloqueados)
@@ -849,7 +1051,7 @@ class WallapopFilter {
       <span class="ml-logo">${ML_ICONS.trend}</span>
       <div class="ml-avg__text">
         <span class="ml-avg__label">Precio medio</span>
-        <span class="ml-avg__value">${this.formatPrice(this.priceAnalysis.averagePrice)} <span class="ml-avg__count">· ${count} anuncios</span></span>
+        <span class="ml-avg__value">${this.formatPrice(this.priceAnalysis.averagePrice)} <span class="ml-avg__count">· ${count} ${count === 1 ? 'anuncio' : 'anuncios'}</span></span>
       </div>
     `;
 
@@ -1159,6 +1361,9 @@ class WallapopFilter {
         // Almacenar los items para uso posterior
         window.wallapopStoredItems = event.data.items;
         console.log('💾 Items almacenados para matching:', event.data.items);
+
+        // Guardar las descripciones para las palabras excluidas
+        this.storeDescriptions(event.data.items);
 
         // Actualizar contadores
         this.kpiStats.totalItems += event.data.items.length;
@@ -1581,6 +1786,19 @@ class WallapopFilter {
         </div>
       </div>
 
+      <section class="ml-card ml-words ml-section-keywords" aria-labelledby="ml-words-title">
+        <div class="ml-words__header">
+          <span class="ml-words__title" id="ml-words-title">Palabras excluidas</span>
+          <span class="ml-words__count" id="ml-words-count">Sin palabras</span>
+        </div>
+        <form class="ml-words__form" id="ml-words-form">
+          <input type="text" id="ml-words-input" class="ml-words__input" maxlength="${this.WORD_MAX_LENGTH}"
+                 placeholder="Palabra o frase" aria-label="Palabra o frase excluida" autocomplete="off">
+          <button type="submit" class="ml-words__add">Añadir</button>
+        </form>
+        <ul class="ml-words__list" id="ml-words-list" aria-label="Palabras excluidas"></ul>
+      </section>
+
       <details class="ml-card ml-settings" id="ml-settings">
         <summary class="ml-settings__summary">Configuración</summary>
         <div class="ml-settings__body">
@@ -1713,6 +1931,21 @@ class WallapopFilter {
 
     if (toggleBtn) toggleBtn.addEventListener('click', () => setOpen(false, true));
     if (this.sidebarTab) this.sidebarTab.addEventListener('click', () => setOpen(true, true));
+
+    // Añadir palabras excluidas
+    const wordsForm = this.filterIndicator.querySelector('#ml-words-form');
+    wordsForm?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = wordsForm.querySelector('#ml-words-input');
+      const text = input.value.trim();
+      if (!text) return;
+      if (this.addBlockedWord(text)) {
+        input.value = '';
+      } else {
+        this.showNotification('Esa palabra ya está en la lista', 'warning');
+      }
+    });
+    this.renderWordList();
 
     // Volver a mostrar todos los anuncios ocultados
     this.filterIndicator.querySelector('#ml-show-hidden')?.addEventListener('click', () => {
