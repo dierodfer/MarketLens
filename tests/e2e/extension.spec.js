@@ -377,6 +377,29 @@ test.describe('Palabras excluidas', () => {
     await expect(page.locator('.ml-ad-filtered')).toHaveCount(0);
   });
 
+  test('el título y la descripción se pueden buscar por separado', async ({ search: page }) => {
+    await addWord(page, 'orbea');
+    await page.locator('#ml-words-input').fill('cesta');
+    await page.locator('#ml-words-input').press('Enter');
+    await expect(card(page, 'a1')).toHaveClass(/ml-ad-filtered/);
+    await expect(card(page, 'a3')).toHaveClass(/ml-ad-filtered/);
+    await page.locator('#ml-settings summary').click();
+
+    // Sin el título solo queda lo de la descripción
+    await featureSwitch(page, 'titles').click();
+    await expect(card(page, 'a1')).not.toHaveClass(/ml-ad-filtered/);
+    await expect(card(page, 'a3')).toHaveClass(/ml-ad-filtered/);
+
+    // Sin ninguno de los dos no se filtra nada
+    await featureSwitch(page, 'descriptions').click();
+    await expect(page.locator('.ml-ad-filtered')).toHaveCount(0);
+
+    // Solo el título
+    await featureSwitch(page, 'titles').click();
+    await expect(card(page, 'a1')).toHaveClass(/ml-ad-filtered/);
+    await expect(card(page, 'a3')).not.toHaveClass(/ml-ad-filtered/);
+  });
+
   test('desactivar la función, o la descripción, lo refleja al momento', async ({ search: page }) => {
     await addWord(page, 'cesta');
     await expect(card(page, 'a3')).toHaveClass(/ml-ad-filtered/);
@@ -391,6 +414,7 @@ test.describe('Palabras excluidas', () => {
     await expect(card(page, 'a3')).not.toHaveClass(/ml-ad-filtered/);
     await expect(page.locator('#ml-words-form')).toBeHidden();
     await expect(featureInput(page, 'descriptions')).toBeDisabled();
+    await expect(featureInput(page, 'titles')).toBeDisabled();
     await expect(page.locator('#wallapop-average-price-display')).toContainText('4 anuncios');
   });
 });
@@ -398,10 +422,10 @@ test.describe('Palabras excluidas', () => {
 test.describe('Configuración', () => {
   test('hay un interruptor por función, todos activos de serie', async ({ search: page }) => {
     await openSettings(page);
-    for (const key of ['filter', 'prices', 'sellers', 'blocking', 'hide', 'keywords', 'descriptions']) {
+    for (const key of ['filter', 'prices', 'sellers', 'blocking', 'hide', 'keywords', 'titles', 'descriptions']) {
       await expect(featureInput(page, key)).toBeChecked();
     }
-    await expect(page.locator('#ml-settings input[data-feature]')).toHaveCount(7);
+    await expect(page.locator('#ml-settings input[data-feature]')).toHaveCount(8);
   });
 
   test('análisis de precios', async ({ search: page }) => {

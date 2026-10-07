@@ -9,7 +9,8 @@ const ML_FEATURES = [
   { key: 'blocking', title: 'Bloquear vendedores', description: 'Oculta todos los anuncios de un vendedor' },
   { key: 'hide', title: 'Ocultar anuncios', description: 'La × oculta y el ojo lo recupera' },
   { key: 'keywords', title: 'Palabras excluidas', description: 'Oculta los anuncios que las contienen' },
-  { key: 'descriptions', title: 'Buscar también en la descripción', description: 'No solo en el título del anuncio' }
+  { key: 'titles', title: 'Buscar en el título', description: 'Compara las palabras con el título' },
+  { key: 'descriptions', title: 'Buscar en la descripción', description: 'La toma de la respuesta de la búsqueda' }
 ];
 
 // Tarjeta de un anuncio: la del perfil de un vendedor es un <a>, la de la búsqueda un <article>
@@ -51,7 +52,7 @@ class WallapopFilter {
   PRICE_MAX = 100000;
 
   // Funciones activables (el filtro se guarda aparte, en extensionEnabled)
-  features = { prices: true, sellers: true, blocking: true, hide: true, keywords: true, descriptions: true };
+  features = { prices: true, sellers: true, blocking: true, hide: true, keywords: true, titles: true, descriptions: true };
 
   // Anuncios ocultados (ruta /item/...) y máximo que se recuerda
   hiddenItems = new Set();
@@ -616,7 +617,7 @@ class WallapopFilter {
     this.filterIndicator?.querySelectorAll('input[data-feature]').forEach((input) => {
       input.checked = this.isFeatureEnabled(input.dataset.feature);
       if (input.dataset.feature === 'blocking') input.disabled = !this.features.sellers;
-      if (input.dataset.feature === 'descriptions') input.disabled = !this.features.keywords;
+      if (['titles', 'descriptions'].includes(input.dataset.feature)) input.disabled = !this.features.keywords;
     });
   }
 
@@ -639,7 +640,7 @@ class WallapopFilter {
     this.features[key] = enabled;
     this.applyFeatureClasses();
     this.syncSettingsUi();
-    if (key === 'hide' || key === 'keywords' || key === 'descriptions') {
+    if (['hide', 'keywords', 'titles', 'descriptions'].includes(key)) {
       this.refreshHiddenAds();
       this.recalculatePrices();
     }
@@ -888,9 +889,11 @@ class WallapopFilter {
   findBlockedWord(card) {
     if (!this.features.keywords || this.wordMatchers.length === 0) return null;
 
-    const title = this.normalizeText(this.getCardTitle(card));
-    const inTitle = title && this.wordMatchers.find(({ regex }) => regex.test(title));
-    if (inTitle) return { word: inTitle.word, where: 'title' };
+    if (this.features.titles) {
+      const title = this.normalizeText(this.getCardTitle(card));
+      const inTitle = title && this.wordMatchers.find(({ regex }) => regex.test(title));
+      if (inTitle) return { word: inTitle.word, where: 'title' };
+    }
 
     if (!this.features.descriptions) return null;
     const key = this.getItemKey(card);

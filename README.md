@@ -109,9 +109,10 @@ El panel tiene una sección plegable **Configuración** con un interruptor por f
 | **Bloquear vendedores** | Desaparece el botón **Bloquear** y la fila de bloqueados. Requiere que el vendedor se muestre. |
 | **Ocultar anuncios** | Desaparecen la × y la fila **Ocultos**, y los anuncios ocultos vuelven a verse. Se recuerdan y vuelven a ocultarse al reactivarla. |
 | **Palabras excluidas** | Se quita la sección del panel y dejan de filtrarse anuncios. La lista se conserva. |
-| **Buscar también en la descripción** | Solo se comparan los títulos. Requiere «Palabras excluidas». |
+| **Buscar en el título** | Las palabras dejan de compararse con el título. |
+| **Buscar en la descripción** | Las palabras dejan de compararse con la descripción. Con los dos desactivados no se filtra nada. Ambos requieren «Palabras excluidas». |
 
-Cómo se comparan las palabras: sin distinguir mayúsculas ni acentos (`electrica` encuentra «Eléctrica») y desde el principio de una palabra (`funda` encuentra «fundas», pero `tv` no encuentra «estuviera»). Una frase tiene que aparecer completa y en ese orden. La descripción no se ve en la tarjeta: se toma de la respuesta de la API de búsqueda de Wallapop, así que solo se puede comparar en los anuncios que esa respuesta incluye. Un anuncio ocultado a mano manda sobre uno filtrado por palabras.
+Cómo se comparan las palabras: sin distinguir mayúsculas ni acentos (`electrica` encuentra «Eléctrica») y desde el principio de una palabra (`funda` encuentra «fundas», pero `tv` no encuentra «estuviera»). Una frase tiene que aparecer completa y en ese orden. La descripción no se ve en la tarjeta: viene en la misma respuesta de la API de búsqueda que la página ya pide para pintar los anuncios (no se hace ninguna petición extra), así que solo se puede comparar en los anuncios que esa respuesta incluye. Un anuncio ocultado a mano manda sobre uno filtrado por palabras.
 
 Desactivar una función no deshace lo ya hecho: los vendedores que bloqueaste no vuelven hasta recargar la página.
 
