@@ -12,8 +12,8 @@
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@semantic-release/exec": "7.1.0",
-    "@semantic-release/git": "10.0.1",
-    "semantic-release": "25.0.9"
+    "@semantic-release/git": "11.0.1",
+    "semantic-release": "26.0.1"
   },
   "engines": {
     "node": ">=22"
